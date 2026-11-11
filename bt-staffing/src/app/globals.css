@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-500: #2a78d6;
+  --color-brand-600: #1f63b8;
+  --color-brand-700: #1a4f93;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background: #f6f7f9;
+  color: #1c2430;
+}
+
+/* Map markers (Leaflet divIcon). Shape + letter, not colour alone. */
+.pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
+  color: #fff;
+  font: 700 11px/1 ui-sans-serif, system-ui, sans-serif;
+}
+.pin-ready { background: #15803d; }
+.pin-notready { background: #dc2626; }
+.pin-staff { background: #2563eb; }
+.pin-case {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #1c2430;
+  transform: rotate(45deg);
+}
+.pin-case > span { transform: rotate(-45deg); }
+.pin-case.pin-restaffing { background: #7c3aed; color: #fff; }
+.leaflet-container { font-family: inherit; }
