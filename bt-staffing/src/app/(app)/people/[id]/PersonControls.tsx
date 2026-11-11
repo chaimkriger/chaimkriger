@@ -2,39 +2,41 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { addNoteAction, setAgeGroupsAction, setChecklistAction } from "@/app/actions";
+import { toast } from "@/components/toast";
+import { cx } from "@/components/ui";
 
-export function ChecklistToggle({ personId, itemKey, label, group, done, disabled }: { personId: string; itemKey: string; label: string; group: string; done: boolean; disabled: boolean }) {
+export function ChecklistToggle({ personId, itemKey, label, done, disabled }: { personId: string; itemKey: string; label: string; done: boolean; disabled: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   // Tick immediately, then confirm with the server.
   const [checked, setChecked] = useState(done);
   useEffect(() => setChecked(done), [done]);
   return (
-    <label className={`flex items-center gap-2 text-sm ${disabled ? "" : "cursor-pointer"}`}>
+    <label className={cx("flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition", disabled ? "" : "cursor-pointer hover:bg-sunken")}>
       <input
         type="checkbox"
-        className="h-4 w-4"
+        className="peer sr-only"
         checked={checked}
         disabled={disabled || pending}
         onChange={(e) => {
           const next = e.target.checked;
-          setError(null);
           setChecked(next);
           start(async () => {
             const r = await setChecklistAction(personId, itemKey, next);
             if (!r.ok) {
-              setError(r.error ?? "Could not save");
+              toast("error", r.error ?? "Could not save");
               setChecked(!next);
             }
             router.refresh();
           });
         }}
       />
-      <span className={checked ? "text-slate-500 line-through" : "text-slate-900"}>{label}</span>
-      <span className="text-xs text-slate-400">{group}</span>
-      {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
+      <span className={cx("flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-ink peer-focus-visible:ring-offset-2", checked ? "border-ready bg-ready text-white" : "border-line-strong bg-surface text-transparent")}>
+        <Check size={12} strokeWidth={3.5} />
+      </span>
+      <span className={checked ? "text-ink-3 line-through decoration-line-strong" : "text-ink"}>{label}</span>
     </label>
   );
 }
@@ -54,11 +56,12 @@ export function AgeGroupEditor({ personId, value, options, disabled }: { personI
             disabled={disabled || pending}
             onClick={() =>
               start(async () => {
-                await setAgeGroupsAction(personId, on ? value.filter((v) => v !== o.value) : [...value, o.value]);
+                const r = await setAgeGroupsAction(personId, on ? value.filter((v) => v !== o.value) : [...value, o.value]);
+                if (!r.ok) toast("error", r.error ?? "Could not save");
                 router.refresh();
               })
             }
-            className={`rounded-full px-2.5 py-1 text-xs ring-1 ring-inset disabled:opacity-60 ${on ? "bg-brand-600 text-white ring-brand-600" : "bg-white text-slate-700 ring-slate-300"}`}
+            className={cx("rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-60", on ? "border-ink bg-inverse text-inverse-ink" : "border-line-strong bg-surface text-ink-2 hover:text-ink")}
           >
             {o.label}
           </button>
@@ -72,24 +75,21 @@ export function NoteForm({ personId }: { personId: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [body, setBody] = useState("");
-  const [error, setError] = useState<string | null>(null);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        setError(null);
         start(async () => {
           const r = await addNoteAction(personId, body);
           if (r.ok) setBody("");
-          else setError(r.error ?? "Could not save");
+          else toast("error", r.error ?? "Could not save");
           router.refresh();
         });
       }}
       className="flex gap-2"
     >
-      <input aria-label="New note" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a note" className="min-w-0 flex-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm" />
-      <button disabled={pending} className="rounded-md bg-white px-3 py-1.5 text-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-60">Add</button>
-      {error && <span role="alert" className="self-center text-xs text-red-700">{error}</span>}
+      <input aria-label="New note" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a note" className="field min-w-0 flex-1" />
+      <button disabled={pending || !body.trim()} className="h-[2.35rem] rounded-[10px] border border-line-strong bg-surface px-3.5 text-sm font-medium hover:bg-raised disabled:opacity-50">Add</button>
     </form>
   );
 }

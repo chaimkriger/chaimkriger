@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -7,8 +9,12 @@ import { MAX_BACKUPS } from "@/lib/constants";
 import { formatMobile } from "@/lib/normalize";
 import { confirmRecipientAction } from "@/app/actions";
 import { ActionButton } from "@/components/ActionButton";
-import { Badge, Card, CaseLink, CaseStatusBadge, fmtDate, PageHeader, PersonLink, ReadyBadge } from "@/components/ui";
+import { buttonClass } from "@/components/button";
+import { Avatar, Badge, CaseStatusBadge, cx, fmtDate, fmtShort, PageHeader, PersonLink, personTone, Stat } from "@/components/ui";
+import { placeConfirm } from "@/components/confirms";
 import { SimulateReply } from "./SimulateReply";
+
+export const metadata: Metadata = { title: "Outreach" };
 
 export default async function OutreachPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,72 +34,91 @@ export default async function OutreachPage({ params }: { params: Promise<{ id: s
   const active = k.case.assignments.filter((a) => !a.expiresAt || a.expiresAt > now);
   const hasPrimary = active.some((a) => a.role === "PRIMARY");
   const backupsFull = active.filter((a) => a.role === "BACKUP").length >= MAX_BACKUPS;
+  const n = (s: string) => k.recipients.filter((r) => r.status === s).length;
 
   return (
     <>
-      <PageHeader title={`Outreach for ${k.case.code}`} subtitle={`Sent ${fmtDate(k.createdAt)}${k.createdBy ? ` by ${k.createdBy.name}` : ""} to ${k.recipients.length} people.`}>
-        <CaseStatusBadge status={k.case.status} />
-        <CaseLink id={k.case.id} code="Open case" />
+      <PageHeader
+        eyebrow={<Link href="/outreach" className="hover:text-ink">Outreach</Link>}
+        title={<span className="flex flex-wrap items-center gap-3">Outreach for <span className="num">{k.case.code}</span> <CaseStatusBadge status={k.case.status} /></span>}
+        subtitle={`Sent ${fmtDate(k.createdAt)}${k.createdBy ? ` by ${k.createdBy.name}` : ""} to ${k.recipients.length} people.`}
+      >
+        <Link href={`/cases/${k.case.id}`} className={buttonClass("secondary", "md")}>Open case</Link>
       </PageHeader>
-      <Card title="Message">
-        <p className="max-w-2xl rounded-lg bg-brand-50 px-3 py-2 text-sm">{k.body}</p>
-        <p className="mt-2 text-xs text-slate-500">
-          Salesmsg mode: <strong>{config.salesmsgMode}</strong>.{" "}
-          {config.salesmsgMode === "mock" ? "No real texts are sent. Use the reply boxes below to simulate what people text back." : ""} The first yes is proposed as primary and later ones as backups. Nothing is placed until you confirm.
-        </p>
-      </Card>
-      <div className="mt-4 space-y-3">
-        {k.recipients.map((r) => {
-          const name = `${r.person.firstName} ${r.person.lastName}`;
-          return (
-            <div key={r.id} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <PersonLink id={r.person.id} name={name} /> <ReadyBadge ready={r.person.ready} />
-                  <div className="text-xs text-slate-500">{formatMobile(r.person.mobile)}</div>
+
+      <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
+            <div className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Message sent</div>
+            <p className="rounded-2xl rounded-br-md bg-inverse px-3.5 py-2.5 text-sm leading-relaxed text-inverse-ink">{k.body}</p>
+            <p className="mt-3 text-xs leading-relaxed text-ink-3">
+              Salesmsg mode: <strong className="text-ink-2">{config.salesmsgMode}</strong>.{" "}
+              {config.salesmsgMode === "mock" ? "No real texts are sent. Use the reply buttons to simulate what people text back. " : ""}
+              The first yes is proposed as primary and later ones as backups. Nothing is placed until you confirm.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Yes" tone="ready" value={n("YES")} />
+            <Stat label="No" tone="notready" value={n("NO")} />
+            <Stat label="Waiting" value={n("SENT")} />
+          </div>
+        </div>
+
+        <ul className="space-y-3">
+          {k.recipients.map((r) => {
+            const name = `${r.person.firstName} ${r.person.lastName}`;
+            const awaiting = r.status === "YES" && !r.confirmedAt;
+            return (
+              <li key={r.id} data-recipient className={cx("rounded-2xl border bg-surface p-4 shadow-card", awaiting ? "border-ready/50" : "border-line")}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Avatar name={name} tone={personTone(r.person.kind, r.person.ready)} size={38} />
+                  <div className="min-w-0 flex-1">
+                    <PersonLink id={r.person.id} name={name} />
+                    <div className="num text-xs text-ink-3">{formatMobile(r.person.mobile)}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {r.status === "SENT" && <Badge>Waiting for reply</Badge>}
+                    {r.status === "YES" && <Badge tone="ready">Yes</Badge>}
+                    {r.status === "NO" && <Badge tone="notready">No</Badge>}
+                    {r.status === "OTHER" && <Badge tone="case">Replied (unclear)</Badge>}
+                    {awaiting && r.proposedRole && <Badge tone={r.proposedRole === "PRIMARY" ? "staff" : "restaff"}>Proposed {r.proposedRole === "PRIMARY" ? "primary (first yes)" : "backup"}</Badge>}
+                    {r.confirmedAt && <Badge tone="staff">Confirmed as {r.proposedRole === "PRIMARY" ? "primary" : "backup"}</Badge>}
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {r.status === "SENT" && <Badge>Waiting for reply</Badge>}
-                  {r.status === "YES" && <Badge tone="green">Yes</Badge>}
-                  {r.status === "NO" && <Badge tone="red">No</Badge>}
-                  {r.status === "OTHER" && <Badge tone="amber">Replied (unclear)</Badge>}
-                  {r.status === "YES" && !r.confirmedAt && r.proposedRole && (
-                    <Badge tone="amber">Proposed {r.proposedRole === "PRIMARY" ? "primary (first yes)" : "backup"}</Badge>
-                  )}
-                  {r.confirmedAt && <Badge tone="blue">Confirmed as {r.proposedRole === "PRIMARY" ? "primary" : "backup"}</Badge>}
-                </div>
-              </div>
-              {r.replyText && (
-                <p className="mt-2 mr-10 rounded-lg bg-slate-100 px-2.5 py-1.5 text-sm">
-                  <span className="block text-[11px] text-slate-500">Reply · {fmtDate(r.repliedAt)}</span>
-                  {r.replyText}
-                </p>
-              )}
-              {r.status === "YES" && !r.confirmedAt && canPlace && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <ActionButton
-                    variant={r.proposedRole === "PRIMARY" ? "primary" : "secondary"}
-                    disabled={hasPrimary}
-                    title={hasPrimary ? "Case already has a primary" : undefined}
-                    confirm={`Place ${name} as primary on ${k.case.code}?`}
-                    action={confirmRecipientAction.bind(null, r.id, "PRIMARY")}
-                  >
-                    Confirm as primary
-                  </ActionButton>
-                  <ActionButton
-                    variant={r.proposedRole === "BACKUP" ? "primary" : "secondary"}
-                    disabled={backupsFull}
-                    title={backupsFull ? "Backups are full" : undefined}
-                    action={confirmRecipientAction.bind(null, r.id, "BACKUP")}
-                  >
-                    Confirm as backup
-                  </ActionButton>
-                </div>
-              )}
-              {!r.confirmedAt && canReply && config.salesmsgMode === "mock" && <SimulateReply recipientId={r.id} hasReply={!!r.replyText} />}
-            </div>
-          );
-        })}
+                {r.replyText && (
+                  <div className="mt-3 flex">
+                    <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-sunken px-3.5 py-2 text-sm text-ink">
+                      {r.replyText}
+                      <span className="mt-1 block text-[0.66rem] text-ink-3">Reply · {fmtShort(r.repliedAt)}</span>
+                    </p>
+                  </div>
+                )}
+                {awaiting && canPlace && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <ActionButton
+                      variant={r.proposedRole === "PRIMARY" ? "primary" : "secondary"}
+                      disabled={hasPrimary}
+                      title={hasPrimary ? "Case already has a primary" : undefined}
+                      confirm={placeConfirm(name, k.case.code)}
+                      action={confirmRecipientAction.bind(null, r.id, "PRIMARY")}
+                    >
+                      Confirm as primary
+                    </ActionButton>
+                    <ActionButton
+                      variant={r.proposedRole === "BACKUP" ? "primary" : "secondary"}
+                      disabled={backupsFull}
+                      title={backupsFull ? "Backups are full" : undefined}
+                      action={confirmRecipientAction.bind(null, r.id, "BACKUP")}
+                    >
+                      Confirm as backup
+                    </ActionButton>
+                  </div>
+                )}
+                {!r.confirmedAt && canReply && config.salesmsgMode === "mock" && <SimulateReply recipientId={r.id} hasReply={!!r.replyText} />}
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </>
   );

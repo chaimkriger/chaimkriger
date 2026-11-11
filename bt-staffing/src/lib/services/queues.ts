@@ -1,6 +1,8 @@
 import { haversineMiles } from "@/lib/geo/distance";
 import type { MatchBreakdown } from "@/lib/matching";
 import { prisma } from "@/lib/db";
+import { config } from "@/lib/config";
+import { nextStep } from "@/lib/nextStep";
 import { readinessOf } from "./people";
 import { type CandidateRow, loadCandidates, loadOpenCases, matchAllOpenCases, rankForCase } from "./matchingService";
 
@@ -12,6 +14,9 @@ export interface CaseMatch {
   status: string;
   breakdown: MatchBreakdown;
 }
+
+/** How many of the readiness steps a person has cleared (for progress rings). */
+export const READINESS_STEPS = 13;
 
 /** Chase: not-ready applicants, nearest open case first, with what is missing. */
 export async function chaseQueue() {
@@ -28,7 +33,7 @@ export async function chaseQueue() {
         if (!nearest || miles < nearest.miles) nearest = { id: c.id, code: c.code, miles };
       }
     }
-    return { person: p, missing: readinessOf(p).missing, nearest };
+    return { person: p, missing: readinessOf(p).missing, nearest, step: nextStep(p, config.requireWorkdayHire) };
   });
   rows.sort((a, b) => (a.nearest?.miles ?? Infinity) - (b.nearest?.miles ?? Infinity));
   return rows;
@@ -72,7 +77,7 @@ export async function openCasesQueue() {
       case: c,
       readyMatches: readyMatches.length,
       allMatches: ranked.length,
-      best: readyMatches[0] ?? null,
+      top: readyMatches.slice(0, 3),
       backups: backupCount.get(c.id) ?? 0,
     };
   });

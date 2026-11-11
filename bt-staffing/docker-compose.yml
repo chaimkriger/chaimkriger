@@ -32,6 +32,8 @@ services:
       INSECURE_COOKIES: "true"
       # Loads the fake demo data the first time the stack starts.
       SEED_ON_START: "true"
+      # One-click demo sign-in buttons on the login page.
+      SHOW_DEMO_LOGINS: "true"
       HUBSPOT_MODE: mock
       APPLOI_MODE: mock
       SALESMSG_MODE: mock

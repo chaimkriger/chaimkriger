@@ -44,7 +44,8 @@ npm run dev                   # http://localhost:3000
 
 Role rules live in one file: `src/lib/permissions.ts`.
 **Change or delete these accounts before real use.** There is no user-management
-screen yet; users are created by the seed script.
+screen yet; users are created by the seed script. The login page shows one-click
+buttons for the demo accounts unless `SHOW_DEMO_LOGINS=false`.
 
 The public applicant form is at `/apply` (no login).
 
@@ -52,17 +53,24 @@ The public applicant form is at `/apply` (no login).
 
 | Screen | Path | What it does |
 |---|---|---|
-| Dashboard | `/dashboard` | Cases waiting and days waiting, applicants by stage, placements per recruiter per month, time from applied to placed |
-| Map | `/map` | Green = ready, red = not ready, blue = current staff with open hours, diamonds = cases needing staffing / restaffing. Filters: state, status, certification, availability, radius around a case |
-| Chase queue | `/queues/chase` | Not-ready people sorted by distance to the nearest open case, with what is missing |
+| Today | `/today` | The home screen. Replies waiting to be confirmed, the longest-waiting cases that already have a ready match, the people one or two steps from ready (with a one-click next step), cases nobody ready can reach, backups about to lapse |
+| Map | `/map` | Green = ready, red = not ready, blue = current staff with open hours, diamonds = cases needing staffing / restaffing. Filters: state, status, certification, availability, radius around a case. Click a case to draw its top ready matches as ranked pins and lines |
+| Chase queue | `/queues/chase` | Not-ready people sorted by distance to the nearest open case (or by fewest missing), with what is missing and a one-click next step |
 | Place queue | `/queues/place` | Ready people with their top matching cases |
 | Open cases | `/queues/open-cases` | Days waiting and number of ready matches |
-| Applicants / Staff / Cases | `/applicants`, `/staff`, `/cases` | Lists with filters |
-| Person | `/people/[id]` | Ready / Not ready with missing items, pipeline steps, paperwork checklist, top cases, texts, notes |
-| Case | `/cases/[id]` | Ranked candidates with score breakdown, primary + backups, outreach, HubSpot write-back status |
+| Pipeline | `/applicants` | Board with one column per stage (default) or a searchable list. Each card's button is that person's next step |
+| Staff / Cases | `/staff`, `/cases` | Lists with filters |
+| Person | `/people/[id]` | Ready / Not ready with missing items, journey with inline step buttons and the paperwork checklist, best open cases, texts, notes |
+| Case | `/cases/[id]` | The matching workspace: team slots (1 primary + 4 backups), ranked candidates with score breakdown, a live mini-map, a detail drawer per candidate, shortlist texting, HubSpot write-back status |
 | Outreach | `/outreach` | Texts sent to shortlists, replies, confirm primary / backups |
+| Insights | `/dashboard` | Cases waiting and days waiting, applicants by stage, placements per recruiter per month, time from applied to placed |
 | Integrations (admin) | `/integrations` | Mock/live status, run a sync, simulate Workday "hired", mock HubSpot records, integration log |
-| Applicant form | `/apply` | Public, mobile first |
+| Applicant form | `/apply` | Public, mobile first, four short steps; keeps a draft on the phone until it is sent |
+
+Around every screen: search for any person or case from the top bar (Ctrl/Cmd+K),
+light and dark themes (follows the device, with a toggle), and a bottom tab bar on phones.
+Colour always means the same thing: green ready, red not ready, blue current staff,
+amber case needing staffing, violet restaffing.
 
 ## How it works
 
@@ -168,6 +176,7 @@ npm test
 
 - `tests/matching.test.ts`: hard rules, score breakdown, staff-first tie break
 - `tests/readiness.test.ts`: pipeline stages and Ready / Not ready rules
+- `tests/nextstep.test.ts`: the "next step" shown on cards and queues
 - `tests/hubspot-writeback.test.ts`: payload, mock adapter, live adapter against
   a fake `fetch`, and an end-to-end run (placement > mock HubSpot record) against
   a real Postgres. The end-to-end part needs `DATABASE_URL_TEST` (a separate,
@@ -185,3 +194,14 @@ HubSpot also holds 6 contacts and 3 cases that have not been imported, so
 ## Stubbed, real, and what you need to supply
 
 See [DEPLOY.md](./DEPLOY.md) for the Azure steps and the full go-live list.
+
+## Screenshots
+
+| | |
+|---|---|
+| Today ![Today](docs/screenshots/today-light.png) | Matching workspace ![Case](docs/screenshots/case-light.png) |
+| Map with a case selected (dark) ![Map](docs/screenshots/mapcase-dark.png) | Pipeline board ![Board](docs/screenshots/board-light.png) |
+| Candidate drawer (dark) ![Drawer](docs/screenshots/drawer-dark.png) | Applicant form ![Form](docs/screenshots/apply1-light.png) |
+
+Map tiles are blank in these captures because the machine that took them could
+not reach OpenStreetMap; they load normally in a browser.

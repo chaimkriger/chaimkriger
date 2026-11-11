@@ -1,22 +1,31 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CheckCircle2, CircleDashed, MapPin, RefreshCw, TriangleAlert } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { config } from "@/lib/config";
 import { AGE_GROUP_LABELS, MAX_BACKUPS } from "@/lib/constants";
-import { slotsToHours } from "@/lib/availability";
+import { formatMobile } from "@/lib/normalize";
 import { loadCandidates, rankForCase } from "@/lib/services/matchingService";
+import { readinessOf } from "@/lib/services/people";
 import { sweepExpiredBackups } from "@/lib/services/assignments";
 import { defaultOutreachBody } from "@/lib/services/outreach";
-import { endAssignmentAction, assignPrimaryAction, retryHubSpotAction, setCaseStatusAction } from "@/app/actions";
+import { assignPrimaryAction, endAssignmentAction, retryHubSpotAction, setCaseStatusAction } from "@/app/actions";
 import { ActionButton } from "@/components/ActionButton";
-import { Badge, Card, CaseStatusBadge, daysSince, fmtDate, KindBadge, PageHeader, PersonLink, ReadyBadge, SlotGrid } from "@/components/ui";
-import { CandidateTable, type CandidateView } from "./CandidateTable";
+import { Avatar, Badge, Card, CaseGlyph, CaseStatusBadge, cx, daysSince, fmtDate, fmtShort, PageHeader, PersonLink, personTone, ScoreLegend, SlotGrid, WaitPill } from "@/components/ui";
+import { placeConfirm } from "@/components/confirms";
+import { type CandidateView, Workspace } from "./Workspace";
 
-export default async function CasePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const c = await prisma.case.findUnique({ where: { id: (await params).id }, select: { code: true } });
+  return { title: c?.code ?? "Case" };
+}
+
+export default async function CasePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ show?: string; focus?: string }> }) {
   const { id } = await params;
-  const { show = "ready" } = await searchParams;
+  const { show = "ready", focus } = await searchParams;
   const user = await requireUser();
   await sweepExpiredBackups();
   const now = new Date();
@@ -24,7 +33,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
     where: { id },
     include: {
       assignments: { include: { person: true, createdBy: true }, orderBy: { createdAt: "asc" } },
-      campaigns: { orderBy: { createdAt: "desc" }, include: { _count: { select: { recipients: true } } } },
+      campaigns: { orderBy: { createdAt: "desc" }, include: { recipients: { select: { status: true } } } },
     },
   });
   if (!c) notFound();
@@ -40,185 +49,209 @@ export default async function CasePage({ params, searchParams }: { params: Promi
 
   const rows = open ? await loadCandidates() : [];
   const outcome = open ? await rankForCase(c, rows) : null;
+  const byId = new Map(rows.map((r) => [r.person.id, r.person]));
   const attached = new Map(active.map((a) => [a.personId, a.role]));
   const ranked = outcome?.ranked ?? [];
   const readyCount = ranked.filter((m) => m.candidate.ready).length;
-  const visible = (show === "all" ? ranked : ranked.filter((m) => m.candidate.ready)).slice(0, 40);
-  const views: CandidateView[] = visible.map((m) => ({
-    id: m.candidate.id,
-    name: m.candidate.name,
-    kind: m.candidate.kind,
-    ready: m.candidate.ready,
-    certification: m.candidate.certification,
-    openSlots: m.candidate.openSlots,
-    attachedAs: attached.get(m.candidate.id) ?? null,
-    breakdown: m.breakdown,
-  }));
+  // A person opened from the Place queue is always shown, even if not in the top slice.
+  const showAll = show === "all" || (!!focus && ranked.some((m) => m.candidate.id === focus && !m.candidate.ready));
+  const visible = (showAll ? ranked : ranked.filter((m) => m.candidate.ready)).slice(0, 40);
+  const views: CandidateView[] = visible.map((m) => {
+    const p = byId.get(m.candidate.id)!;
+    return {
+      id: p.id, name: m.candidate.name, kind: p.kind, ready: m.candidate.ready, certification: p.certification,
+      openSlots: m.candidate.openSlots, attachedAs: attached.get(p.id) ?? null, breakdown: m.breakdown,
+      lat: p.lat!, lng: p.lng!, city: p.city, mobile: formatMobile(p.mobile), hasCar: p.hasCar, languages: p.languages,
+      missing: m.candidate.ready ? [] : readinessOf(p).missing,
+    };
+  });
   const rankOf = new Map(ranked.map((m, i) => [m.candidate.id, { rank: i + 1, m }]));
+
+  const slot = "flex min-h-[4.25rem] items-center gap-3 rounded-xl border px-3 py-2.5";
+  const team = (
+    <Card
+      title="Team on this case"
+      hint={`One primary and up to ${MAX_BACKUPS} backups. Backups stay 30 days unless placed elsewhere.`}
+      className={c.status === "RESTAFFING" && backups.length ? "border-restaff/50" : ""}
+    >
+      {c.status === "RESTAFFING" && backups.length > 0 && (
+        <p className="mb-3 flex items-center gap-2 rounded-xl bg-restaff-soft px-3 py-2 text-sm font-medium text-restaff-ink">
+          <RefreshCw size={15} /> This case is restaffing. Offer it to these backups first.
+        </p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className={cx(slot, "sm:col-span-2 lg:col-span-5", primary ? "border-staff/40 bg-staff-soft/40" : "border-dashed border-line-strong")} data-slot="primary">
+          {primary ? (
+            <>
+              <Avatar name={`${primary.person.firstName} ${primary.person.lastName}`} tone="staff" size={40} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[0.68rem] font-medium uppercase tracking-[0.07em] text-staff-ink">Primary BT</div>
+                <PersonLink id={primary.person.id} name={`${primary.person.firstName} ${primary.person.lastName}`} />
+                <div className="text-xs text-ink-3">Placed {fmtDate(primary.createdAt)}{primary.createdBy ? ` by ${primary.createdBy.name}` : ""}{primary.via === "outreach" ? " · from outreach" : ""}</div>
+              </div>
+              {canPlace && (
+                <ActionButton variant="danger" action={endAssignmentAction.bind(null, primary.id)} confirm={{ title: "Remove the primary BT?", body: "The case moves to restaffing and HubSpot is updated. Backups stay attached.", confirmLabel: "Remove primary", danger: true }}>
+                  Remove
+                </ActionButton>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-line-strong text-ink-3"><CircleDashed size={18} /></span>
+              <div>
+                <div className="text-[0.68rem] font-medium uppercase tracking-[0.07em] text-ink-3">Primary BT</div>
+                <div className="text-sm text-ink-2">{c.status === "DISCHARGED" ? "Case discharged." : "Open. Pick someone from the ranked list below."}</div>
+              </div>
+            </>
+          )}
+        </div>
+        {Array.from({ length: MAX_BACKUPS }, (_, i) => {
+          const b = backups[i];
+          if (!b) {
+            return (
+              <div key={i} className={cx(slot, "border-dashed border-line text-xs text-ink-3")} data-slot="backup-empty">
+                Backup {i + 1}: open
+              </div>
+            );
+          }
+          const name = `${b.person.firstName} ${b.person.lastName}`;
+          const r = rankOf.get(b.personId);
+          const daysLeft = b.expiresAt ? Math.max(0, Math.ceil((b.expiresAt.getTime() - now.getTime()) / 86400_000)) : null;
+          return (
+            <div key={b.id} className={cx(slot, "flex-col !items-stretch border-restaff/40 bg-restaff-soft/40 lg:col-span-1")} data-slot="backup">
+              <div className="flex items-center gap-2.5">
+                <Avatar name={name} tone={personTone(b.person.kind, b.person.ready)} size={30} />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-sm"><PersonLink id={b.person.id} name={name} /></div>
+                  <div className="text-[0.7rem] text-ink-3">Backup · {daysLeft} days left</div>
+                </div>
+              </div>
+              {open && <div className="text-[0.7rem] text-ink-2">{r ? `Rank #${r.rank} · score ${r.m.breakdown.total} · ${r.m.breakdown.driveMinutes} min` : "No longer fits the hours or travel limit"}</div>}
+              {canPlace && (
+                <div className="flex flex-wrap gap-1.5">
+                  {open && <ActionButton variant="primary" confirm={placeConfirm(name, c.code)} action={assignPrimaryAction.bind(null, c.id, b.personId)} disabled={!b.person.ready} title={b.person.ready ? undefined : "Not ready yet"}>Place as primary</ActionButton>}
+                  <ActionButton variant="ghost" action={endAssignmentAction.bind(null, b.id)}>Remove</ActionButton>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+
+  const rail = (
+    <>
+      <Card title="Hours needed" hint={`About ${c.hoursPerWeek} hours a week`}>
+        <SlotGrid slots={c.slots} />
+      </Card>
+      <Card title="Requirements">
+        <dl className="space-y-2.5 text-sm">
+          <div className="flex justify-between gap-2"><dt className="text-ink-2">RBT required</dt><dd className="font-medium">{c.rbtRequired ? "Yes" : "No"}</dd></div>
+          <div className="flex justify-between gap-2"><dt className="text-ink-2">Language</dt><dd className="font-medium">{c.languageRequired ?? "No requirement"}</dd></div>
+          <div className="flex justify-between gap-2"><dt className="text-ink-2">Age group</dt><dd className="font-medium">{c.ageGroup ? AGE_GROUP_LABELS[c.ageGroup] ?? c.ageGroup : "-"}</dd></div>
+          <div className="flex justify-between gap-2"><dt className="text-ink-2">Assessment done</dt><dd className="font-medium">{fmtDate(c.assessmentCompletedAt)}</dd></div>
+        </dl>
+        {c.notes && <p className="mt-3 rounded-xl bg-raised p-3 text-sm text-ink-2">{c.notes}</p>}
+      </Card>
+      <Card title="HubSpot write-back" actions={<Badge tone={config.hubspotMode === "live" ? "ready" : "case"}>{config.hubspotMode}</Badge>}>
+        <div className="flex items-start gap-2.5 text-sm">
+          {c.hubspotSyncStatus === "ok" ? <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-ready" /> : c.hubspotSyncStatus === "error" ? <TriangleAlert size={17} className="mt-0.5 shrink-0 text-notready" /> : <CircleDashed size={17} className="mt-0.5 shrink-0 text-ink-3" />}
+          <div className="min-w-0">
+            <div className="font-medium text-ink">
+              {c.hubspotSyncStatus === "ok" ? `Written ${fmtDate(c.hubspotSyncedAt)}` : c.hubspotSyncStatus === "error" ? "Last write failed" : c.hubspotSyncStatus === "skipped" ? "Skipped" : "Nothing written yet"}
+            </div>
+            <div className="num text-xs text-ink-3">Record {c.hubspotId ?? "none"}</div>
+            {c.hubspotSyncError && <p className="mt-1.5 rounded-lg bg-notready-soft p-2 text-xs text-notready-ink">{c.hubspotSyncError}</p>}
+          </div>
+        </div>
+        {canPlace && c.hubspotId && <div className="mt-3"><ActionButton action={retryHubSpotAction.bind(null, c.id)}>Write to HubSpot now</ActionButton></div>}
+      </Card>
+      <Card title="Outreach">
+        {c.campaigns.length === 0 ? (
+          <p className="text-sm text-ink-2">No texts sent yet. Tick people in the ranked list to text a shortlist.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {c.campaigns.map((k) => (
+              <li key={k.id} className="flex items-center justify-between gap-2">
+                <Link href={`/outreach/${k.id}`} className="font-medium text-ink underline decoration-line-strong underline-offset-4">{fmtShort(k.createdAt)}</Link>
+                <span className="text-xs text-ink-3">{k.recipients.length} texted · {k.recipients.filter((r) => r.status === "YES").length} yes</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {history.length > 0 && (
+        <Card title="History">
+          <ul className="space-y-2 text-sm">
+            {history.map((a) => (
+              <li key={a.id} className="leading-snug">
+                <PersonLink id={a.person.id} name={`${a.person.firstName} ${a.person.lastName}`} />
+                <div className="text-xs text-ink-3">{a.role.toLowerCase()} · {fmtShort(a.createdAt)} to {fmtShort(a.endedAt)} · {(a.endReason ?? a.status).replaceAll("_", " ")}</div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </>
+  );
 
   return (
     <>
-      <PageHeader title={c.code} subtitle={`${c.clientLabel} · ${[c.address ?? c.city, !c.address ? c.state : null].filter(Boolean).join(", ")}`}>
-        <CaseStatusBadge status={c.status} />
-        {open && <Badge tone={daysSince(c.waitingSince) > 21 ? "red" : "slate"}>Waiting {daysSince(c.waitingSince)} days</Badge>}
+      <PageHeader
+        eyebrow={<Link href="/cases" className="hover:text-ink">Cases</Link>}
+        title={<span className="flex flex-wrap items-center gap-3"><CaseGlyph status={c.status} size={38} /><span className="num">{c.code}</span><CaseStatusBadge status={c.status} />{open && <WaitPill days={daysSince(c.waitingSince)} />}</span>}
+        subtitle={<span className="inline-flex items-center gap-1.5"><MapPin size={14} /> {c.clientLabel} · {c.address ?? [c.city, c.state].filter(Boolean).join(", ")}</span>}
+      >
         {canStatus && c.status === "STAFFED" && (
-          <ActionButton variant="secondary" confirm="Move this case to restaffing? The primary BT comes off; backups stay." action={setCaseStatusAction.bind(null, c.id, "RESTAFFING")}>Move to restaffing</ActionButton>
+          <ActionButton size="md" action={setCaseStatusAction.bind(null, c.id, "RESTAFFING")} confirm={{ title: "Move this case to restaffing?", body: "The primary BT comes off and HubSpot is updated. Backups stay attached and are shown first.", confirmLabel: "Move to restaffing" }}>
+            Move to restaffing
+          </ActionButton>
         )}
         {canStatus && c.status !== "DISCHARGED" && (
-          <ActionButton variant="danger" confirm="Discharge this case? Everyone attached to it is released." action={setCaseStatusAction.bind(null, c.id, "DISCHARGED")}>Discharge</ActionButton>
+          <ActionButton size="md" variant="danger" action={setCaseStatusAction.bind(null, c.id, "DISCHARGED")} confirm={{ title: "Discharge this case?", body: "Everyone attached to it is released and it leaves the map and the queues.", confirmLabel: "Discharge", danger: true }}>
+            Discharge
+          </ActionButton>
         )}
-        {canStatus && c.status === "DISCHARGED" && (
-          <ActionButton action={setCaseStatusAction.bind(null, c.id, "NEEDS_STAFFING")}>Reopen</ActionButton>
-        )}
+        {canStatus && c.status === "DISCHARGED" && <ActionButton size="md" action={setCaseStatusAction.bind(null, c.id, "NEEDS_STAFFING")}>Reopen</ActionButton>}
       </PageHeader>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Hours needed">
-          <SlotGrid slots={c.slots} />
-          <p className="mt-2 text-xs text-slate-500">About {c.hoursPerWeek} hours a week ({c.slots.length} blocks of ~{slotsToHours(c.slots) / Math.max(1, c.slots.length)} hrs).</p>
-        </Card>
-        <Card title="Requirements">
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">RBT required</dt><dd>{c.rbtRequired ? <Badge tone="blue">Yes</Badge> : "No"}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">Language</dt><dd>{c.languageRequired ?? "No requirement"}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">Age group</dt><dd>{c.ageGroup ? AGE_GROUP_LABELS[c.ageGroup] ?? c.ageGroup : "-"}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">Assessment done</dt><dd>{fmtDate(c.assessmentCompletedAt)}</dd></div>
-          </dl>
-          {c.notes && <p className="mt-3 rounded bg-slate-50 p-2 text-sm text-slate-700">{c.notes}</p>}
-        </Card>
-        <Card title="HubSpot write-back">
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">Mode</dt><dd><Badge tone={config.hubspotMode === "live" ? "green" : "amber"}>{config.hubspotMode}</Badge></dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-slate-500">HubSpot record</dt><dd className="tabular-nums">{c.hubspotId ?? "none"}</dd></div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-slate-500">Last write</dt>
-              <dd>
-                {c.hubspotSyncStatus === "ok" ? <Badge tone="green">OK · {fmtDate(c.hubspotSyncedAt)}</Badge>
-                  : c.hubspotSyncStatus === "error" ? <Badge tone="red">Failed</Badge>
-                  : c.hubspotSyncStatus === "skipped" ? <Badge tone="amber">Skipped</Badge>
-                  : <span className="text-slate-500">Nothing written yet</span>}
-              </dd>
-            </div>
-          </dl>
-          {c.hubspotSyncError && <p className="mt-2 rounded bg-red-50 p-2 text-xs text-red-800">{c.hubspotSyncError}</p>}
-          {canPlace && c.hubspotId && (
-            <div className="mt-3"><ActionButton action={retryHubSpotAction.bind(null, c.id)}>Write to HubSpot now</ActionButton></div>
-          )}
-        </Card>
-      </div>
+      {team}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card title="Primary BT">
-          {primary ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <PersonLink id={primary.person.id} name={`${primary.person.firstName} ${primary.person.lastName}`} />
-                <div className="text-xs text-slate-500">Placed {fmtDate(primary.createdAt)}{primary.createdBy ? ` by ${primary.createdBy.name}` : ""}{primary.via === "outreach" ? " (from outreach)" : ""}</div>
-              </div>
-              {canPlace && (
-                <ActionButton variant="danger" confirm="Remove the primary BT? The case moves to restaffing." action={endAssignmentAction.bind(null, primary.id)}>Remove</ActionButton>
-              )}
+      {open && outcome ? (
+        <section className="mt-6" aria-label="Ranked candidates">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">Ranked candidates</h2>
+              <p className="mt-0.5 max-w-2xl text-xs text-ink-3">
+                Ties go to current staff. Left out: {outcome.excluded.over_max_travel} over their own travel limit, {outcome.excluded.no_overlap} with no overlapping hours, {outcome.excluded.no_location} without a location. The list only ranks; you make the placement.
+              </p>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500">{c.status === "DISCHARGED" ? "Case discharged." : "No primary BT yet. Pick one from the ranked list below."}</p>
-          )}
-        </Card>
-        <Card title={`Backups (${backups.length} of ${MAX_BACKUPS})`}>
-          {c.status === "RESTAFFING" && backups.length > 0 && (
-            <p className="mb-3 rounded bg-violet-50 px-2 py-1.5 text-sm text-violet-900">This case is restaffing. Offer it to these backups first.</p>
-          )}
-          {backups.length === 0 ? (
-            <p className="text-sm text-slate-500">No backups attached.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {backups.map((b) => {
-                const r = rankOf.get(b.personId);
-                const daysLeft = b.expiresAt ? Math.max(0, Math.ceil((b.expiresAt.getTime() - now.getTime()) / 86400_000)) : null;
-                return (
-                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                    <div>
-                      <PersonLink id={b.person.id} name={`${b.person.firstName} ${b.person.lastName}`} />{" "}
-                      <KindBadge kind={b.person.kind} /> <ReadyBadge ready={b.person.ready} />
-                      <div className="text-xs text-slate-500">
-                        Attached {fmtDate(b.createdAt)} · {daysLeft} days left
-                        {open && (r ? ` · rank #${r.rank}, score ${r.m.breakdown.total}, ${r.m.breakdown.driveMinutes} min` : " · no longer matches this case's hours or travel limit")}
-                      </div>
-                    </div>
-                    {canPlace && (
-                      <div className="flex gap-1">
-                        {open && <ActionButton variant="primary" confirm={`Place ${b.person.firstName} ${b.person.lastName} as primary on ${c.code}?`} action={assignPrimaryAction.bind(null, c.id, b.personId)}>Place as primary</ActionButton>}
-                        <ActionButton variant="danger" action={endAssignmentAction.bind(null, b.id)}>Remove</ActionButton>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      {open && outcome && (
-        <div className="mt-4">
-          <Card
-            title="Ranked candidates"
-            actions={
-              <div className="flex gap-1 text-xs">
-                <Link href={`/cases/${c.id}`} className={`rounded px-2 py-1 ${show !== "all" ? "bg-brand-600 text-white" : "ring-1 ring-slate-200"}`}>Ready only ({readyCount})</Link>
-                <Link href={`/cases/${c.id}?show=all`} className={`rounded px-2 py-1 ${show === "all" ? "bg-brand-600 text-white" : "ring-1 ring-slate-200"}`}>Include not ready ({ranked.length})</Link>
-              </div>
-            }
-          >
-            <p className="mb-3 text-xs text-slate-500">
-              Score = drive time (40) + hours covered (40) + requirements (20). Ties go to current staff. Left out: {outcome.excluded.over_max_travel} over their own travel limit, {outcome.excluded.no_overlap} with no overlapping hours, {outcome.excluded.no_location} with no map location. The list only ranks; you make the placement.
-            </p>
-            <CandidateTable
-              caseId={c.id}
-              caseCode={c.code}
-              caseSlots={c.slots}
-              candidates={views}
-              canPlace={canPlace}
-              canOutreach={canOutreach}
-              hasPrimary={!!primary}
-              backupsFull={backups.length >= MAX_BACKUPS}
-              defaultMessage={defaultOutreachBody(c)}
-            />
-          </Card>
-        </div>
+            <div className="inline-flex gap-0.5 rounded-xl bg-sunken p-1 text-[0.82rem] font-medium">
+              <Link href={`/cases/${c.id}`} scroll={false} className={cx("rounded-lg px-3 py-1.5", !showAll ? "bg-surface text-ink shadow-sm" : "text-ink-2")}>Ready only <span className="num text-xs text-ink-3">{readyCount}</span></Link>
+              <Link href={`/cases/${c.id}?show=all`} scroll={false} className={cx("rounded-lg px-3 py-1.5", showAll ? "bg-surface text-ink shadow-sm" : "text-ink-2")}>Include not ready <span className="num text-xs text-ink-3">{ranked.length}</span></Link>
+            </div>
+          </div>
+          <div className="mb-3"><ScoreLegend /></div>
+          <Workspace
+            caseId={c.id}
+            caseCode={c.code}
+            caseSlots={c.slots}
+            center={c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null}
+            restaffing={c.status === "RESTAFFING"}
+            candidates={views}
+            canPlace={canPlace}
+            canOutreach={canOutreach}
+            hasPrimary={!!primary}
+            backupsFull={backups.length >= MAX_BACKUPS}
+            defaultMessage={defaultOutreachBody(c)}
+            focusId={focus ?? null}
+            rail={rail}
+          />
+        </section>
+      ) : (
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{rail}</div>
       )}
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card title="Outreach for this case">
-          {c.campaigns.length === 0 ? (
-            <p className="text-sm text-slate-500">No texts sent yet. Tick people in the ranked list and send a "case starting near you" text.</p>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {c.campaigns.map((k) => (
-                <li key={k.id}>
-                  <Link href={`/outreach/${k.id}`} className="font-medium text-brand-700 hover:underline">{fmtDate(k.createdAt)}</Link>{" "}
-                  <span className="text-slate-500">· {k._count.recipients} texted</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <Card title="Assignment history">
-          {history.length === 0 ? (
-            <p className="text-sm text-slate-500">No past assignments.</p>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {history.map((a) => (
-                <li key={a.id}>
-                  <PersonLink id={a.person.id} name={`${a.person.firstName} ${a.person.lastName}`} />{" "}
-                  <span className="text-slate-500">
-                    · {a.role.toLowerCase()} · {fmtDate(a.createdAt)} to {fmtDate(a.endedAt)} · {(a.endReason ?? a.status).replaceAll("_", " ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
     </>
   );
 }

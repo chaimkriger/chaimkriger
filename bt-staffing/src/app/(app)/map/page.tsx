@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { readinessOf } from "@/lib/services/people";
 import { loadCandidates, loadOpenCases } from "@/lib/services/matchingService";
 import { PageHeader } from "@/components/ui";
 import { MapView, type MapCase, type MapPerson } from "./MapView";
+
+export const metadata: Metadata = { title: "Map" };
 
 export default async function MapPage() {
   const [rows, cases, unlocated] = await Promise.all([
@@ -33,11 +36,12 @@ export default async function MapPage() {
     .map((c) => ({
       id: c.id, code: c.code, status: c.status as "NEEDS_STAFFING" | "RESTAFFING", state: c.state, city: c.city,
       lat: c.lat!, lng: c.lng!, slots: c.slots, rbtRequired: c.rbtRequired, languageRequired: c.languageRequired,
+      hoursPerWeek: c.hoursPerWeek,
       daysWaiting: Math.max(0, Math.floor((Date.now() - c.waitingSince.getTime()) / 86400_000)),
     }));
   return (
     <>
-      <PageHeader title="Map" subtitle="Applicants, current staff with open hours, and cases waiting for a BT. Staffed and discharged cases and fully booked staff are hidden." />
+      <PageHeader title="Map" subtitle="Click a case to see who could take it. Staffed and discharged cases and fully booked staff are hidden." />
       <MapView people={people} cases={mapCases} unlocated={unlocated} />
     </>
   );

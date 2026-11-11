@@ -129,6 +129,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'SALESMSG_WEBHOOK_SECRET', value: salesmsgWebhookSecret }
         { name: 'CRON_SECRET', value: cronSecret }
         { name: 'SEED_ON_START', value: 'false' }
+        { name: 'SHOW_DEMO_LOGINS', value: 'false' }
       ]
     }
   }

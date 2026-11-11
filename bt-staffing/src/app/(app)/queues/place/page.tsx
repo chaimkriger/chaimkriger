@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Car, Clock, Footprints } from "lucide-react";
 import { placeQueue } from "@/lib/services/queues";
-import { describeSlots, slotsToHours } from "@/lib/availability";
-import { CaseLink, CertBadge, FilterTabs, KindBadge, PageHeader, PersonLink, Table, Td } from "@/components/ui";
+import { slotsToHours } from "@/lib/availability";
+import { QueueTabs } from "@/components/QueueTabs";
+import { Avatar, Badge, CertBadge, EmptyState, FilterTabs, KindBadge, PageHeader, PersonLink, personTone, Ring, SlotGrid } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Place queue" };
 
 export default async function PlacePage({ searchParams }: { searchParams: Promise<{ state?: string; kind?: string }> }) {
   const { state = "", kind = "" } = await searchParams;
@@ -8,56 +14,67 @@ export default async function PlacePage({ searchParams }: { searchParams: Promis
   const rows = all.filter((r) => (!state || r.row.person.state === state) && (!kind || r.row.person.kind === kind));
   return (
     <>
-      <PageHeader title="Place queue" subtitle="Everyone who is ready, with their best open cases. Open a case to make the placement; the system never places anyone by itself." />
-      <div className="mb-3 flex flex-wrap gap-4">
-        <FilterTabs base="/queues/place" param="state" value={state} extra={{ kind }} options={[
-          { value: "", label: "All states" }, { value: "NY", label: "NY" }, { value: "NJ", label: "NJ" }, { value: "CO", label: "CO" },
-        ]} />
+      <PageHeader title="Place" subtitle="Everyone who is ready, with the open cases they fit best. Pick a case to open its matching workspace; you make the placement there." />
+      <QueueTabs active="place" />
+      <div className="mb-4 flex flex-wrap gap-3">
         <FilterTabs base="/queues/place" param="kind" value={kind} extra={{ state }} options={[
           { value: "", label: "Everyone", count: all.length },
           { value: "APPLICANT", label: "New hires", count: all.filter((r) => r.row.person.kind === "APPLICANT").length },
           { value: "STAFF", label: "Current staff", count: all.filter((r) => r.row.person.kind === "STAFF").length },
         ]} />
+        <FilterTabs base="/queues/place" param="state" value={state} extra={{ kind }} options={[
+          { value: "", label: "All states" }, { value: "NY", label: "NY" }, { value: "NJ", label: "NJ" }, { value: "CO", label: "CO" },
+        ]} />
       </div>
-      <Table head={["Person", "Type", "Open hours", "Top matching cases (score / drive / hours covered)"]} empty={!rows.length}>
-        {rows.map(({ row, matches }) => (
-          <tr key={row.person.id}>
-            <Td>
-              <PersonLink id={row.person.id} name={row.candidate.name} />
-              <div className="text-xs text-slate-500">{[row.person.city, row.person.state].filter(Boolean).join(", ")} · up to {row.person.maxTravelMinutes} min</div>
-            </Td>
-            <Td>
-              <div className="flex flex-col items-start gap-1">
-                <KindBadge kind={row.person.kind} />
-                <CertBadge certification={row.person.certification} kind={row.person.kind} />
-              </div>
-            </Td>
-            <Td className="max-w-56 text-xs text-slate-600">
-              <span className="font-medium text-slate-800">~{slotsToHours(row.candidate.openSlots)} hrs/wk</span>
-              <div>{describeSlots(row.candidate.openSlots)}</div>
-            </Td>
-            <Td>
-              {matches.length === 0 ? (
-                <span className="text-sm text-slate-500">No open case within reach right now</span>
-              ) : (
-                <ul className="space-y-1">
-                  {matches.slice(0, 3).map((m) => (
-                    <li key={m.caseId} className="flex flex-wrap items-center gap-x-2 text-sm">
-                      <span className="inline-block w-9 rounded bg-slate-800 px-1 text-center text-xs font-semibold tabular-nums text-white">{m.breakdown.total}</span>
-                      <CaseLink id={m.caseId} code={m.code} />
-                      <span className="text-xs text-slate-500">
-                        {m.city} · {m.breakdown.driveMinutes} min · {m.breakdown.overlapSlots.length}/{m.breakdown.caseSlotCount} hours
-                        {m.status === "RESTAFFING" ? " · restaffing" : ""}
-                      </span>
-                    </li>
-                  ))}
-                  {matches.length > 3 && <li className="text-xs text-slate-500">+{matches.length - 3} more matching cases</li>}
-                </ul>
-              )}
-            </Td>
-          </tr>
-        ))}
-      </Table>
+      {rows.length === 0 ? (
+        <EmptyState title="Nobody ready in this view">Clear missing items in the Chase queue to fill this list.</EmptyState>
+      ) : (
+        <ul className="grid gap-3 xl:grid-cols-2">
+          {rows.map(({ row, matches }) => {
+            const p = row.person;
+            return (
+              <li key={p.id} data-row className="rounded-2xl border border-line bg-surface p-4 shadow-card">
+                <div className="flex items-start gap-3">
+                  <Avatar name={row.candidate.name} tone={personTone(p.kind, true)} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <PersonLink id={p.id} name={row.candidate.name} />
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <KindBadge kind={p.kind} />
+                      <CertBadge certification={p.certification} kind={p.kind} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2">
+                      <span>{[p.city, p.state].filter(Boolean).join(", ")}</span>
+                      <span className="inline-flex items-center gap-1">{p.hasCar ? <Car size={13} /> : <Footprints size={13} />} up to {p.maxTravelMinutes} min</span>
+                      <span className="inline-flex items-center gap-1"><Clock size={13} /> ~{slotsToHours(row.candidate.openSlots)} hrs/wk open</span>
+                    </div>
+                  </div>
+                  <div className="hidden sm:block"><SlotGrid compact slots={row.candidate.openSlots} /></div>
+                </div>
+                <div className="mt-3 border-t border-line pt-3">
+                  {matches.length === 0 ? (
+                    <p className="text-sm text-ink-3">No open case within reach right now.</p>
+                  ) : (
+                    <ul className="grid gap-2 sm:grid-cols-3">
+                      {matches.slice(0, 3).map((m) => (
+                        <li key={m.caseId}>
+                          <Link href={`/cases/${m.caseId}?focus=${p.id}`} className="flex items-center gap-2.5 rounded-xl border border-line bg-raised p-2.5 transition hover:border-ink">
+                            <Ring value={m.breakdown.total} size={36} />
+                            <span className="min-w-0 leading-tight">
+                              <span className="num block truncate text-[0.83rem] font-medium text-ink">{m.code}</span>
+                              <span className="block truncate text-[0.7rem] text-ink-3">{m.breakdown.driveMinutes} min · {m.breakdown.overlapSlots.length}/{m.breakdown.caseSlotCount} hrs{m.status === "RESTAFFING" ? " · restaff" : ""}</span>
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {matches.length > 3 && <div className="mt-2"><Badge>+{matches.length - 3} more matching cases on the profile</Badge></div>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </>
   );
 }

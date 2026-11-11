@@ -2,55 +2,91 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import type { ActionResult } from "@/app/actions";
+import { Dialog } from "./Dialog";
+import { toast } from "./toast";
+import { BUTTON, buttonClass } from "./button";
 
-const VARIANTS = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700",
-  secondary: "bg-white text-slate-800 ring-1 ring-inset ring-slate-300 hover:bg-slate-50",
-  danger: "bg-white text-red-700 ring-1 ring-inset ring-red-300 hover:bg-red-50",
-  ghost: "text-brand-700 hover:bg-brand-50",
-};
+export interface ConfirmSpec {
+  title: string;
+  body: React.ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+}
 
 /**
- * Button that runs a server action, then refreshes the page. Shows the
- * action's error (or success message) right under the button.
+ * Button that runs a server action, shows a toast with the outcome and
+ * refreshes the page. With `confirm`, it asks first in a proper dialog.
  */
 export function ActionButton({
-  action, children, variant = "secondary", confirm, size = "sm", disabled, title,
+  action, children, variant = "secondary", confirm, size = "sm", disabled, title, className, onDone,
 }: {
   action: () => Promise<ActionResult>;
   children: React.ReactNode;
-  variant?: keyof typeof VARIANTS;
-  confirm?: string;
-  size?: "sm" | "md";
+  variant?: keyof typeof BUTTON.variant;
+  confirm?: ConfirmSpec;
+  size?: keyof typeof BUTTON.size;
   disabled?: boolean;
   title?: string;
+  className?: string;
+  onDone?: (r: ActionResult) => void;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [result, setResult] = useState<ActionResult | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  const run = () => {
+    setAsking(false);
+    start(async () => {
+      const r = await action();
+      // A redirecting action resolves to undefined.
+      if (r) {
+        if (r.ok) {
+          if (r.message) toast("success", r.message);
+        } else {
+          toast("error", r.error ?? "Something went wrong.");
+        }
+        onDone?.(r);
+      }
+      router.refresh();
+    });
+  };
+
   return (
-    <span className="inline-flex flex-col items-start gap-1">
+    <>
       <button
         type="button"
         title={title}
         disabled={pending || disabled}
-        onClick={() => {
-          if (confirm && !window.confirm(confirm)) return;
-          setResult(null);
-          start(async () => {
-            const r = await action();
-            // A redirecting action resolves to undefined.
-            if (r) setResult(r);
-            router.refresh();
-          });
+        aria-busy={pending}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirm) setAsking(true);
+          else run();
         }}
-        className={`whitespace-nowrap rounded-md font-medium disabled:cursor-not-allowed disabled:opacity-50 ${size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm"} ${VARIANTS[variant]}`}
+        className={buttonClass(variant, size, className)}
       >
-        {pending ? "Working..." : children}
+        {pending && <Loader2 size={14} className="animate-spin" />}
+        {children}
       </button>
-      {result?.error && <span role="alert" className="max-w-xs text-xs text-red-700">{result.error}</span>}
-      {result?.ok && result.message && <span role="status" className="max-w-xs text-xs text-green-700">{result.message}</span>}
-    </span>
+      {confirm && (
+        <Dialog
+          open={asking}
+          onClose={() => setAsking(false)}
+          title={confirm.title}
+          footer={
+            <>
+              <button type="button" className={buttonClass("secondary", "md")} onClick={() => setAsking(false)}>Cancel</button>
+              <button type="button" className={buttonClass(confirm.danger ? "danger" : "primary", "md")} onClick={run} data-confirm>
+                {confirm.confirmLabel}
+              </button>
+            </>
+          }
+        >
+          <div className="text-sm leading-relaxed text-ink-2">{confirm.body}</div>
+        </Dialog>
+      )}
+    </>
   );
 }

@@ -79,6 +79,7 @@ App or any scheduler that can send an HTTP POST works just as well.
 | `SEND_FORM_LINK_ON_INTAKE` | `false` if Salesmsg already texts the form link itself |
 | `REQUIRE_WORKDAY_HIRE` | `false` to let people be Ready without the Workday event |
 | `SEED_ON_START` | `true` loads fake demo data into an empty database |
+| `SHOW_DEMO_LOGINS` | `false` hides the one-click demo account buttons on the login page (the Bicep template sets it to `false`) |
 
 ---
 

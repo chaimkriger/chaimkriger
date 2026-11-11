@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { ApplyForm } from "./ApplyForm";
 
-export const metadata: Metadata = { title: "United Care ABA - Tell us your availability" };
+export const metadata: Metadata = { title: "Tell us your availability · United Care ABA" };
 
 export default function ApplyPage() {
   return (
-    <main className="mx-auto max-w-lg px-4 py-6">
-      <h1 className="text-xl font-semibold text-slate-900">United Care ABA</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Thanks for applying! This takes about 2 minutes and helps us match you to a case near you.
-      </p>
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col px-5 pb-8 pt-6">
+      <header className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-inverse text-[0.72rem] font-bold text-inverse-ink">UC</span>
+        <span className="text-sm font-semibold text-ink">United Care ABA</span>
+      </header>
       <ApplyForm />
     </main>
   );

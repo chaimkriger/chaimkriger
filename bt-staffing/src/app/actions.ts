@@ -57,7 +57,7 @@ export async function loginAction(input: { email: string; password: string; next
     maxAge: SESSION_HOURS * 3600,
   });
   // Only follow same-site relative paths.
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/today");
 }
 
 export async function logoutAction() {
