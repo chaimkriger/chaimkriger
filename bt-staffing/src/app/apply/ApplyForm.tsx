@@ -53,7 +53,7 @@ export function ApplyForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-5 space-y-5" noValidate>
+    <form onSubmit={submit} onChangeCapture={() => setError(null)} onClickCapture={() => setError(null)} className="mt-5 space-y-5" noValidate>
       <div className="grid grid-cols-2 gap-3">
         <label className={label}>
           First name
