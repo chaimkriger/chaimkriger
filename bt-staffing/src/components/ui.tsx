@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CASE_STATUS_LABELS, DAYS, DAY_LABELS, PERIODS, PERIOD_LABELS, STAGE_LABELS, type StageKey } from "@/lib/constants";
+import { CASE_STATUS_LABELS, DAYS, DAY_LABELS, PERIODS, PERIOD_LABELS, STAGE_HELP, STAGE_LABELS, type StageKey } from "@/lib/constants";
+import { matchLabel } from "@/lib/matching";
 
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
@@ -87,8 +88,9 @@ export function KindBadge({ kind }: { kind: string }) {
 }
 
 export function StageBadge({ stage }: { stage: string }) {
-  if (stage === "APPLIED") return <Badge tone="case">Form not completed</Badge>;
-  return <Badge tone={stage === "PLACED" ? "staff" : stage === "READY_TO_PLACE" ? "ready" : "neutral"}>{STAGE_LABELS[stage as StageKey] ?? stage}</Badge>;
+  const help = STAGE_HELP[stage as StageKey];
+  if (stage === "APPLIED") return <Badge tone="case" title={help}>Form not completed</Badge>;
+  return <Badge title={help} tone={stage === "PLACED" ? "staff" : stage === "READY_TO_PLACE" ? "ready" : "neutral"}>{STAGE_LABELS[stage as StageKey] ?? stage}</Badge>;
 }
 
 export function caseTone(status: string): Tone {
@@ -250,11 +252,37 @@ export function ScoreBar({ drive, availability, requirements, showLegend = false
 export function ScoreLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
-      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s1" />Drive time, up to 40</span>
-      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s2" />Hours covered, up to 40</span>
-      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s3" />Requirements fit, up to 20</span>
+      <span className="font-medium text-ink">The score (out of 100) adds up:</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s1" />how close they live</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s2" />how many of the hours they can cover</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-s3" />how well they fit the requirements</span>
     </div>
   );
+}
+
+/** The score as a word, so nobody has to interpret a number. */
+export function MatchWord({ total, className = "" }: { total: number; className?: string }) {
+  return <span className={cx("font-semibold text-ink", className)}>{matchLabel(total)}</span>;
+}
+
+/** "7 steps left" with a bar that fills as steps are done. */
+export function StepsProgress({ done, total, tone = "notready" }: { done: number; total: number; tone?: "ready" | "notready" }) {
+  const left = Math.max(0, total - done);
+  return (
+    <div className="w-full min-w-28" title={`${done} of ${total} steps done`}>
+      <div className="text-sm font-semibold text-ink">
+        {left === 0 ? "All steps done" : <><span className="num">{left}</span> {left === 1 ? "step" : "steps"} left</>}
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+        <div className={cx("h-full rounded-full", tone === "ready" ? "bg-ready" : "bg-notready")} style={{ width: `${(done / total) * 100}%` }} />
+      </div>
+      <div className="mt-1 text-[0.7rem] text-ink-3"><span className="num">{done}</span> of <span className="num">{total}</span> done</div>
+    </div>
+  );
+}
+
+export function fmtMiles(miles: number): string {
+  return miles < 0.1 ? "Under 0.1 mi" : `${miles.toFixed(1)} mi`;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,5 +371,5 @@ export function fmtShort(d: Date | string | null | undefined): string {
 /** Days-waiting pill that heats up as the wait grows. */
 export function WaitPill({ days }: { days: number }) {
   const tone: Tone = days > 30 ? "notready" : days > 14 ? "case" : "neutral";
-  return <Badge tone={tone} title="Days waiting for a BT"><span className="num">{days}</span> {days === 1 ? "day" : "days"}</Badge>;
+  return <Badge tone={tone} title="How long this case has been waiting for a BT">Waiting <span className="num">{days}</span> {days === 1 ? "day" : "days"}</Badge>;
 }

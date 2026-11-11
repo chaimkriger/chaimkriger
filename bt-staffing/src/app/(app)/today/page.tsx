@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import { todayData } from "@/lib/services/today";
 import { buttonClass } from "@/components/button";
 import { NextStepButton } from "@/components/NextStepButton";
-import { Avatar, Badge, Card, CaseGlyph, CaseLink, EmptyState, fmtShort, MissingList, PageHeader, PersonLink, personTone, Ring, Stat, WaitPill } from "@/components/ui";
+import { Avatar, Badge, Card, CaseGlyph, CaseLink, EmptyState, fmtMiles, fmtShort, MatchWord, MissingList, PageHeader, PersonLink, personTone, Ring, Stat, WaitPill } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Today" };
 
@@ -31,7 +31,7 @@ export default async function TodayPage() {
   const almost = (
     <Card
       title="Closest to ready"
-      hint="One or two things left. Clearing these turns red pins green."
+      hint="People with only one or two things left before they can work."
       actions={<Link href="/queues/chase?sort=missing" className={buttonClass("ghost")}>Chase queue <ArrowRight size={14} /></Link>}
       flush
     >
@@ -47,7 +47,7 @@ export default async function TodayPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2">
                     <PersonLink id={p.id} name={name} />
-                    <span className="text-xs text-ink-3">{p.city ?? "No location"}{miles != null ? ` · ${miles.toFixed(1)} mi to a case` : ""}</span>
+                    <span className="text-xs text-ink-3">{p.city ?? "No location"}{miles != null ? ` · ${fmtMiles(miles).toLowerCase()} from a waiting case` : ""}</span>
                   </div>
                   <div className="mt-1"><MissingList missing={missing} /></div>
                 </div>
@@ -63,7 +63,7 @@ export default async function TodayPage() {
   const placeable = (
     <Card
       title="Ready to staff now"
-      hint="Longest-waiting cases that already have a ready match."
+      hint="Cases that have waited longest and already have someone who can take them."
       actions={<Link href="/queues/open-cases" className={buttonClass("ghost")}>All open cases <ArrowRight size={14} /></Link>}
       flush
     >
@@ -88,6 +88,7 @@ export default async function TodayPage() {
                 <div className="flex -space-x-1.5" title={`${readyCount} ready matches`}>
                   {top.map((t) => <Avatar key={t.id} name={t.name} tone={personTone(t.kind, true)} size={26} />)}
                 </div>
+                <span className="hidden text-right text-[0.72rem] leading-tight sm:block"><MatchWord total={top[0].total} /><span className="block text-ink-3">best person</span></span>
                 <Ring value={top[0].total} size={38} />
                 <Link href={`/cases/${c.id}`} className={buttonClass(canPlace ? "primary" : "secondary")}>{canPlace ? "Staff it" : "View"}</Link>
               </div>
@@ -107,10 +108,10 @@ export default async function TodayPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Cases waiting" tone="case" value={d.stats.openCases} note={d.stats.over30 ? `${d.stats.over30} waiting over 30 days` : `Average ${d.stats.avgWait} days`} href="/queues/open-cases" />
-        <Stat label="Ready to place" tone="ready" value={d.stats.readyApplicants} note="New hires with nothing missing" href="/queues/place" />
-        <Stat label="Still to chase" tone="notready" value={d.stats.notReady} note={d.formWaiting ? `${d.formWaiting} have sat on the form 3+ days` : "Not ready yet"} href="/queues/chase" />
-        <Stat label="Placements this month" tone="staff" value={d.stats.placementsThisMonth} note="Primary placements" href="/dashboard" />
+        <Stat label="Cases waiting for a BT" tone="case" value={d.stats.openCases} note={d.stats.over30 ? `${d.stats.over30} waiting over 30 days` : `Average ${d.stats.avgWait} days`} href="/queues/open-cases" />
+        <Stat label="People ready to place" tone="ready" value={d.stats.readyApplicants} note="New hires with nothing missing" href="/queues/place" />
+        <Stat label="People to chase" tone="notready" value={d.stats.notReady} note={d.formWaiting ? `${d.formWaiting} have not filled in the form for 3+ days` : "Something is still missing"} href="/queues/chase" />
+        <Stat label="Placed this month" tone="staff" value={d.stats.placementsThisMonth} note="People placed as primary BT" href="/dashboard" />
       </div>
 
       {(d.toConfirm.length > 0 || d.failedWrites.length > 0) && (

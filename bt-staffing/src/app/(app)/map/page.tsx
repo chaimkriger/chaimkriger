@@ -41,7 +41,7 @@ export default async function MapPage() {
     }));
   return (
     <>
-      <PageHeader title="Map" subtitle="Click a case to see who could take it. Staffed and discharged cases and fully booked staff are hidden." />
+      <PageHeader title="Map" subtitle="Tap a case (a diamond) to see who could take it. Cases that already have a BT, and staff with no free hours, are not shown." />
       <MapView people={people} cases={mapCases} unlocated={unlocated} />
     </>
   );

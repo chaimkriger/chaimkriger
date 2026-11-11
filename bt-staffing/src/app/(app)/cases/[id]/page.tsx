@@ -100,7 +100,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
               <span className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-line-strong text-ink-3"><CircleDashed size={18} /></span>
               <div>
                 <div className="text-[0.68rem] font-medium uppercase tracking-[0.07em] text-ink-3">Primary BT</div>
-                <div className="text-sm text-ink-2">{c.status === "DISCHARGED" ? "Case discharged." : "Open. Pick someone from the ranked list below."}</div>
+                <div className="text-sm text-ink-2">{c.status === "DISCHARGED" ? "Case discharged." : "Open. Pick someone from the list below."}</div>
               </div>
             </>
           )}
@@ -126,7 +126,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
                   <div className="text-[0.7rem] text-ink-3">Backup · {daysLeft} days left</div>
                 </div>
               </div>
-              {open && <div className="text-[0.7rem] text-ink-2">{r ? `Rank #${r.rank} · score ${r.m.breakdown.total} · ${r.m.breakdown.driveMinutes} min` : "No longer fits the hours or travel limit"}</div>}
+              {open && <div className="text-[0.7rem] text-ink-2">{r ? `#${r.rank} in the list · ${r.m.breakdown.driveMinutes} min away` : "No longer fits the hours or travel limit"}</div>}
               {canPlace && (
                 <div className="flex flex-wrap gap-1.5">
                   {open && <ActionButton variant="primary" confirm={placeConfirm(name, c.code)} action={assignPrimaryAction.bind(null, c.id, b.personId)} disabled={!b.person.ready} title={b.person.ready ? undefined : "Not ready yet"}>Place as primary</ActionButton>}
@@ -142,7 +142,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
 
   const rail = (
     <>
-      <Card title="Hours needed" hint={`About ${c.hoursPerWeek} hours a week`}>
+      <Card title="Hours needed" hint={`About ${c.hoursPerWeek} hours a week. Dark squares are the times a BT is needed.`}>
         <SlotGrid slots={c.slots} />
       </Card>
       <Card title="Requirements">
@@ -154,22 +154,22 @@ export default async function CasePage({ params, searchParams }: { params: Promi
         </dl>
         {c.notes && <p className="mt-3 rounded-xl bg-raised p-3 text-sm text-ink-2">{c.notes}</p>}
       </Card>
-      <Card title="HubSpot write-back" actions={<Badge tone={config.hubspotMode === "live" ? "ready" : "case"}>{config.hubspotMode}</Badge>}>
+      <Card title="Saved to HubSpot" hint="Who is on this case is copied to the case record in HubSpot." actions={<Badge tone={config.hubspotMode === "live" ? "ready" : "case"}>{config.hubspotMode === "live" ? "Live" : "Test mode"}</Badge>}>
         <div className="flex items-start gap-2.5 text-sm">
           {c.hubspotSyncStatus === "ok" ? <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-ready" /> : c.hubspotSyncStatus === "error" ? <TriangleAlert size={17} className="mt-0.5 shrink-0 text-notready" /> : <CircleDashed size={17} className="mt-0.5 shrink-0 text-ink-3" />}
           <div className="min-w-0">
             <div className="font-medium text-ink">
-              {c.hubspotSyncStatus === "ok" ? `Written ${fmtDate(c.hubspotSyncedAt)}` : c.hubspotSyncStatus === "error" ? "Last write failed" : c.hubspotSyncStatus === "skipped" ? "Skipped" : "Nothing written yet"}
+              {c.hubspotSyncStatus === "ok" ? `Saved ${fmtDate(c.hubspotSyncedAt)}` : c.hubspotSyncStatus === "error" ? "The last save did not go through" : c.hubspotSyncStatus === "skipped" ? "Skipped" : "Nothing saved yet"}
             </div>
-            <div className="num text-xs text-ink-3">Record {c.hubspotId ?? "none"}</div>
+            <div className="num text-xs text-ink-3">HubSpot record {c.hubspotId ?? "none"}</div>
             {c.hubspotSyncError && <p className="mt-1.5 rounded-lg bg-notready-soft p-2 text-xs text-notready-ink">{c.hubspotSyncError}</p>}
           </div>
         </div>
-        {canPlace && c.hubspotId && <div className="mt-3"><ActionButton action={retryHubSpotAction.bind(null, c.id)}>Write to HubSpot now</ActionButton></div>}
+        {canPlace && c.hubspotId && <div className="mt-3"><ActionButton action={retryHubSpotAction.bind(null, c.id)}>Save to HubSpot again</ActionButton></div>}
       </Card>
       <Card title="Outreach">
         {c.campaigns.length === 0 ? (
-          <p className="text-sm text-ink-2">No texts sent yet. Tick people in the ranked list to text a shortlist.</p>
+          <p className="text-sm text-ink-2">No texts sent yet. Tick people in the list to text them about this case.</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {c.campaigns.map((k) => (
@@ -219,12 +219,12 @@ export default async function CasePage({ params, searchParams }: { params: Promi
       {team}
 
       {open && outcome ? (
-        <section className="mt-6" aria-label="Ranked candidates">
+        <section className="mt-6" aria-label="Who could take this case">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">Ranked candidates</h2>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink">Who could take this case</h2>
               <p className="mt-0.5 max-w-2xl text-xs text-ink-3">
-                Ties go to current staff. Left out: {outcome.excluded.over_max_travel} over their own travel limit, {outcome.excluded.no_overlap} with no overlapping hours, {outcome.excluded.no_location} without a location. The list only ranks; you make the placement.
+                Best match first. On a tie, current staff come before new hires. Not shown: {outcome.excluded.over_max_travel} people who live further away than they said they would travel, {outcome.excluded.no_overlap} whose hours do not overlap, {outcome.excluded.no_location} with no address. This list only suggests; you choose who is placed.
               </p>
             </div>
             <div className="inline-flex gap-0.5 rounded-xl bg-sunken p-1 text-[0.82rem] font-medium">

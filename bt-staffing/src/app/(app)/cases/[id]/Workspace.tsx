@@ -8,8 +8,8 @@ import { ActionButton } from "@/components/ActionButton";
 import { buttonClass } from "@/components/button";
 import { placeConfirm } from "@/components/confirms";
 import { Dialog } from "@/components/Dialog";
-import { Avatar, Badge, CertBadge, cx, KindBadge, MissingList, personTone, ReadyBadge, Ring, ScoreBar, SlotGrid } from "@/components/ui";
-import type { MatchBreakdown } from "@/lib/matching";
+import { Avatar, Badge, CertBadge, cx, KindBadge, MatchWord, MissingList, personTone, ReadyBadge, Ring, ScoreBar, SlotGrid } from "@/components/ui";
+import { fitSummary, type MatchBreakdown, matchSentence } from "@/lib/matching";
 import { MiniMap, type MiniPin } from "./MiniMap";
 
 export interface CandidateView {
@@ -108,7 +108,7 @@ export function Workspace({
       <div className="min-w-0">
         {candidates.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line-strong px-6 py-12 text-center text-sm text-ink-2">
-            No candidates match this case yet. Switch to &quot;Include not ready&quot; to see who is close, then chase them.
+            Nobody ready can take this case yet. Switch to &quot;Include not ready&quot; to see who is close, then chase them.
           </p>
         ) : (
           <ol className="space-y-2">
@@ -122,7 +122,7 @@ export function Workspace({
                   onMouseEnter={() => setHovered(c.id)}
                   onMouseLeave={() => setHovered(null)}
                   className={cx(
-                    "group grid items-center gap-x-4 gap-y-3 rounded-2xl border bg-surface px-3.5 py-3 shadow-card transition md:grid-cols-[auto_minmax(0,1fr)_minmax(0,15rem)_auto]",
+                    "group grid items-center gap-x-4 gap-y-3 rounded-2xl border bg-surface px-3.5 py-3 shadow-card transition md:grid-cols-[auto_minmax(0,1fr)_minmax(0,17rem)_auto]",
                     isSelected ? "border-ink" : c.attachedAs ? "border-restaff/50" : "border-line hover:border-line-strong",
                   )}
                 >
@@ -135,7 +135,7 @@ export function Workspace({
                   <button type="button" onClick={() => setOpenId(c.id)} className="flex min-w-0 items-center gap-3 rounded-xl text-left" aria-label={`Open details for ${c.name}`}>
                     <Avatar name={c.name} tone={personTone(c.kind, c.ready)} size={38} />
                     <span className="min-w-0">
-                      <span className="block truncate text-[0.95rem] font-medium text-ink group-hover:underline group-hover:decoration-line-strong group-hover:underline-offset-4">{c.name}</span>
+                      <span className="block text-[0.95rem] font-medium leading-tight text-ink group-hover:underline group-hover:decoration-line-strong group-hover:underline-offset-4">{c.name}</span>
                       <span className="mt-1 flex flex-wrap gap-1">
                         <KindBadge kind={c.kind} />
                         {!c.ready && <ReadyBadge ready={false} />}
@@ -147,13 +147,11 @@ export function Workspace({
                   <div className="flex items-center gap-3">
                     <Ring value={b.total} size={44} />
                     <div className="min-w-0 flex-1">
+                      <div className="mb-1 text-[0.8rem]"><MatchWord total={b.total} /></div>
                       <ScoreBar drive={b.driveScore} availability={b.availabilityScore} requirements={b.requirementsScore} />
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 text-[0.72rem] text-ink-2">
-                        <span><span className="num font-medium text-ink">{b.driveMinutes}</span> min</span>
-                        <span><span className="num font-medium text-ink">{b.overlapSlots.length}/{b.caseSlotCount}</span> hours</span>
-                        <span className="inline-flex items-center gap-0.5" title={b.requirements.map((r) => `${r.label}: ${r.detail}`).join("\n") || "No special requirements"}>
-                          {b.requirements.length === 0 ? "no reqs" : b.requirements.map((r) => <ReqIcon key={r.label} credit={r.credit} />)}
-                        </span>
+                      <div className="mt-1.5 text-[0.72rem] leading-snug text-ink-2">
+                        {matchSentence(b)}
+                        <span className={cx("block", fitSummary(b.requirements).ok ? "" : fitSummary(b.requirements).text.startsWith("Missing") ? "text-notready-ink" : "text-case-ink")}>{fitSummary(b.requirements).text}</span>
                       </div>
                     </div>
                   </div>
@@ -165,7 +163,7 @@ export function Workspace({
         )}
         {candidates.length > shown.length && (
           <button type="button" onClick={() => setShowAll(true)} className={buttonClass("secondary", "md", "mt-3 w-full")}>
-            Show {candidates.length - shown.length} more candidates
+            Show {candidates.length - shown.length} more people
           </button>
         )}
       </div>
@@ -174,7 +172,7 @@ export function Workspace({
         {center && (
           <div className="rounded-2xl border border-line bg-surface p-2 shadow-card">
             <MiniMap center={center} restaffing={restaffing} pins={pins} activeId={openId ?? hovered} onPick={setOpenId} />
-            <p className="px-2 pb-1 pt-2 text-xs text-ink-3">Numbers are ranks. Hover a row to find the person; click a pin for details.</p>
+            <p className="px-2 pb-1 pt-2 text-xs text-ink-3">The diamond is the case. Numbers match the list: 1 is the best match. Point at a row to find that person; click a pin for details.</p>
           </div>
         )}
         {rail}
@@ -243,7 +241,7 @@ export function Workspace({
             <div className="flex items-center gap-4 rounded-2xl bg-raised p-4">
               <Ring value={open.breakdown.total} size={64} stroke={5} />
               <div className="min-w-0 flex-1">
-                <div className="mb-2 text-sm font-medium text-ink">Match score</div>
+                <div className="mb-2 text-sm text-ink"><MatchWord total={open.breakdown.total} /> <span className="text-ink-3">· match score {open.breakdown.total} out of 100</span></div>
                 <ScoreBar drive={open.breakdown.driveScore} availability={open.breakdown.availabilityScore} requirements={open.breakdown.requirementsScore} showLegend />
               </div>
             </div>
@@ -257,13 +255,13 @@ export function Workspace({
             </section>
 
             <section>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Hours: covers {open.breakdown.overlapSlots.length} of {open.breakdown.caseSlotCount} blocks</h3>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Hours: can cover {open.breakdown.overlapSlots.length} of {open.breakdown.caseSlotCount} time slots</h3>
               <SlotGrid slots={[]} highlight={open.breakdown.overlapSlots} muted={caseSlots.filter((s) => !open.breakdown.overlapSlots.includes(s))} />
               <p className="mt-1.5 text-xs text-ink-3">Green = case hours this person can cover. Hatched = case hours they cannot.</p>
             </section>
 
             <section>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Requirements</h3>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Requirements: {fitSummary(open.breakdown.requirements).text}</h3>
               {open.breakdown.requirements.length === 0 ? (
                 <p className="text-sm text-ink-2">This case has no special requirements.</p>
               ) : (

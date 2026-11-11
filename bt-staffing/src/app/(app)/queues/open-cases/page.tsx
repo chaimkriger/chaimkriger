@@ -22,7 +22,7 @@ export default async function OpenCasesPage({ searchParams }: { searchParams: Pr
   const maxDays = Math.max(1, ...rows.map((r) => daysSince(r.case.waitingSince)));
   return (
     <>
-      <PageHeader title="Open cases" subtitle="Cases waiting for a BT, longest wait first, with how many ready people match each one." />
+      <PageHeader title="Open cases" subtitle="Cases waiting for a BT, longest wait first, and how many people could take each one today." />
       <QueueTabs active="open-cases" />
       <div className="mb-4">
         <FilterTabs base="/queues/open-cases" param="state" value={state} options={[
@@ -37,7 +37,7 @@ export default async function OpenCasesPage({ searchParams }: { searchParams: Pr
           {rows.map(({ case: c, readyMatches, allMatches, top, backups }) => {
             const days = daysSince(c.waitingSince);
             return (
-              <li key={c.id} data-row className="relative grid items-center gap-x-5 gap-y-3 overflow-hidden rounded-2xl border border-line bg-surface px-4 py-3 shadow-card transition hover:border-line-strong md:grid-cols-[minmax(0,14rem)_7rem_minmax(0,1fr)_minmax(0,13rem)_auto]">
+              <li key={c.id} data-row className="relative grid items-center gap-x-5 gap-y-3 overflow-hidden rounded-2xl border border-line bg-surface px-4 py-3 shadow-card transition hover:border-line-strong md:grid-cols-[minmax(0,13rem)_9rem_minmax(0,1fr)_minmax(0,14rem)_auto]">
                 <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${days > 30 ? "bg-notready" : days > 14 ? "bg-case" : "bg-line-strong"}`} style={{ opacity: 0.35 + 0.65 * (days / maxDays) }} />
                 <div className="flex min-w-0 items-center gap-3">
                   <CaseGlyph status={c.status} size={36} />
@@ -61,8 +61,8 @@ export default async function OpenCasesPage({ searchParams }: { searchParams: Pr
                     {top.map((m) => <Avatar key={m.candidate.id} name={m.candidate.name} tone={personTone(m.candidate.kind, true)} size={28} />)}
                   </div>
                   <div className="text-xs leading-tight">
-                    <div className={readyMatches === 0 ? "font-semibold text-notready-ink" : "font-semibold text-ink"}><span className="num">{readyMatches}</span> ready match{readyMatches === 1 ? "" : "es"}</div>
-                    <div className="text-ink-3"><span className="num">{allMatches - readyMatches}</span> more not ready</div>
+                    <div className={readyMatches === 0 ? "font-semibold text-notready-ink" : "font-semibold text-ink"}>{readyMatches === 0 ? "Nobody ready yet" : <><span className="num">{readyMatches}</span> {readyMatches === 1 ? "person" : "people"} ready for it</>}</div>
+                    <div className="text-ink-3"><span className="num">{allMatches - readyMatches}</span> more could, once ready</div>
                   </div>
                 </div>
                 <Link href={`/cases/${c.id}${readyMatches === 0 ? "?show=all" : ""}`} className={buttonClass(canPlace && readyMatches > 0 ? "primary" : "secondary")}>

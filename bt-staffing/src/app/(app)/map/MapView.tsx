@@ -46,6 +46,9 @@ interface Match {
   lat: number;
   lng: number;
   total: number;
+  label: string;
+  sentence: string;
+  fit: string;
   driveMinutes: number;
   overlap: number;
   caseSlots: number;
@@ -314,8 +317,8 @@ export function MapView({ people, cases, unlocated }: { people: MapPerson[]; cas
                 {selCase.languageRequired && <Badge>{selCase.languageRequired}</Badge>}
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <h3 className="text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Top ready matches</h3>
-                {activeMatches && <span className="text-xs text-ink-3"><span className="num">{activeMatches.readyCount}</span> ready in total</span>}
+                <h3 className="text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Best people for this case</h3>
+                {activeMatches && <span className="text-xs text-ink-3"><span className="num">{activeMatches.readyCount}</span> could take it</span>}
               </div>
               {!activeMatches ? (
                 <div className="mt-2 space-y-2">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-12" />)}</div>
@@ -329,9 +332,9 @@ export function MapView({ people, cases, unlocated }: { people: MapPerson[]; cas
                         <span className="num w-4 text-center text-xs font-semibold text-ink-3">{m.rank}</span>
                         <Avatar name={m.name} tone={m.kind === "STAFF" ? "staff" : "ready"} size={26} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[0.83rem] font-medium text-ink">{m.name}</span>
+                          <span className="block truncate text-[0.83rem] font-medium text-ink">{m.name} <span className="font-normal text-ink-3">· {m.label}</span></span>
                           <span className="mt-1 block"><ScoreBar drive={m.driveScore} availability={m.availabilityScore} requirements={m.requirementsScore} /></span>
-                          <span className="mt-0.5 block text-[0.68rem] text-ink-3">{m.driveMinutes} min · {m.overlap}/{m.caseSlots} hours</span>
+                          <span className="mt-0.5 block text-[0.68rem] text-ink-3">{m.sentence}</span>
                         </span>
                         <Ring value={m.total} size={34} />
                       </button>
@@ -340,7 +343,7 @@ export function MapView({ people, cases, unlocated }: { people: MapPerson[]; cas
                 </ol>
               )}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href={`/cases/${selCase.id}`} className={buttonClass("primary", "md", "flex-1")}>Open matching workspace <ArrowUpRight size={15} /></Link>
+                <Link href={`/cases/${selCase.id}`} className={buttonClass("primary", "md", "flex-1")}>Open this case <ArrowUpRight size={15} /></Link>
                 <button type="button" onClick={() => setCenterCase(selCase.id)} className={buttonClass("secondary", "md")} title={`Show only pins within ${radius} miles of this case`}>
                   <Crosshair size={15} /> {radius} mi
                 </button>
@@ -378,7 +381,7 @@ export function MapView({ people, cases, unlocated }: { people: MapPerson[]; cas
             <div data-panel-list>
               <div className="px-4 pt-4">
                 <h2 className="text-[0.93rem] font-semibold text-ink">Cases waiting in view</h2>
-                <p className="mt-0.5 text-xs text-ink-3">Longest wait first. Pick one to draw its best matches on the map.</p>
+                <p className="mt-0.5 text-xs text-ink-3">Longest wait first. Tap one to see the best people for it on the map.</p>
               </div>
               {waitingList.length === 0 ? (
                 <p className="p-4 text-sm text-ink-2">No open cases match these filters.</p>

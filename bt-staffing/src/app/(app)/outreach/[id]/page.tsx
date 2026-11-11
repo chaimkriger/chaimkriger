@@ -52,8 +52,7 @@ export default async function OutreachPage({ params }: { params: Promise<{ id: s
             <div className="mb-2 text-xs font-medium uppercase tracking-[0.07em] text-ink-3">Message sent</div>
             <p className="rounded-2xl rounded-br-md bg-inverse px-3.5 py-2.5 text-sm leading-relaxed text-inverse-ink">{k.body}</p>
             <p className="mt-3 text-xs leading-relaxed text-ink-3">
-              Salesmsg mode: <strong className="text-ink-2">{config.salesmsgMode}</strong>.{" "}
-              {config.salesmsgMode === "mock" ? "No real texts are sent. Use the reply buttons to simulate what people text back. " : ""}
+              {config.salesmsgMode === "mock" ? "Test mode: no real texts are sent. Use the reply buttons under each person to pretend they texted back. " : ""}
               The first yes is proposed as primary and later ones as backups. Nothing is placed until you confirm.
             </p>
           </div>

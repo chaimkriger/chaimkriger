@@ -49,7 +49,7 @@ export default async function IntegrationsPage() {
                 <span className={cx("h-2 w-2 rounded-full", s.live ? "bg-ready" : "bg-case")} />
                 {s.name}
               </span>
-              <Badge tone={s.live ? "ready" : "case"}>{s.mode}</Badge>
+              <Badge tone={s.live ? "ready" : "case"}>{s.mode === "mock" ? "Test mode" : s.mode === "live" ? "Live" : s.mode}</Badge>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-ink-2">{s.note}</p>
           </div>

@@ -192,3 +192,37 @@ export function rankCandidates(
   ranked.sort(compareMatches);
   return { ranked, excluded };
 }
+
+// ---------------------------------------------------------------------------
+// Plain-language summaries of a match, for people who should not have to
+// read a score breakdown.
+// ---------------------------------------------------------------------------
+
+/** One or two words for the total score. */
+export function matchLabel(total: number): "Great match" | "Good match" | "Fair match" | "Weak match" {
+  if (total >= 80) return "Great match";
+  if (total >= 60) return "Good match";
+  if (total >= 40) return "Fair match";
+  return "Weak match";
+}
+
+const shortRequirement = (label: string) =>
+  label === "RBT required" ? "RBT certification" : label.startsWith("Speaks ") ? label.slice(7) : "experience with this age group";
+
+/** "Meets every requirement" / "Missing: Spanish" / "To check: ..." */
+export function fitSummary(requirements: RequirementCheck[]): { text: string; ok: boolean } {
+  if (requirements.length === 0) return { text: "No special requirements", ok: true };
+  const missing = requirements.filter((r) => r.credit === 0).map((r) => shortRequirement(r.label));
+  const unsure = requirements.filter((r) => r.credit > 0 && r.credit < 1).map((r) => shortRequirement(r.label));
+  if (!missing.length && !unsure.length) return { text: "Meets every requirement", ok: true };
+  const parts: string[] = [];
+  if (missing.length) parts.push(`Missing: ${missing.join(", ")}`);
+  if (unsure.length) parts.push(`To check: ${unsure.join(", ")}`);
+  return { text: parts.join(". "), ok: false };
+}
+
+/** The whole match in one sentence. */
+export function matchSentence(b: Pick<MatchBreakdown, "driveMinutes" | "overlapSlots" | "caseSlotCount">): string {
+  const all = b.overlapSlots.length === b.caseSlotCount;
+  return `${b.driveMinutes} min away · can cover ${all ? "all" : `${b.overlapSlots.length} of`} ${b.caseSlotCount} time slot${b.caseSlotCount === 1 ? "" : "s"}`;
+}

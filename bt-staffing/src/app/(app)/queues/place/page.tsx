@@ -4,6 +4,7 @@ import { Car, Clock, Footprints } from "lucide-react";
 import { placeQueue } from "@/lib/services/queues";
 import { slotsToHours } from "@/lib/availability";
 import { QueueTabs } from "@/components/QueueTabs";
+import { matchLabel } from "@/lib/matching";
 import { Avatar, Badge, CertBadge, EmptyState, FilterTabs, KindBadge, PageHeader, PersonLink, personTone, Ring, SlotGrid } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Place queue" };
@@ -14,7 +15,7 @@ export default async function PlacePage({ searchParams }: { searchParams: Promis
   const rows = all.filter((r) => (!state || r.row.person.state === state) && (!kind || r.row.person.kind === kind));
   return (
     <>
-      <PageHeader title="Place" subtitle="Everyone who is ready, with the open cases they fit best. Pick a case to open its matching workspace; you make the placement there." />
+      <PageHeader title="Place" subtitle="Everyone who can start now, with the three waiting cases they fit best. Tap a case to see the details and place them. Nobody is placed until you do it." />
       <QueueTabs active="place" />
       <div className="mb-4 flex flex-wrap gap-3">
         <FilterTabs base="/queues/place" param="kind" value={kind} extra={{ state }} options={[
@@ -48,7 +49,7 @@ export default async function PlacePage({ searchParams }: { searchParams: Promis
                       <span className="inline-flex items-center gap-1"><Clock size={13} /> ~{slotsToHours(row.candidate.openSlots)} hrs/wk open</span>
                     </div>
                   </div>
-                  <div className="hidden sm:block"><SlotGrid compact slots={row.candidate.openSlots} /></div>
+                  <div className="hidden sm:block" title="The times this person is free"><SlotGrid compact slots={row.candidate.openSlots} /></div>
                 </div>
                 <div className="mt-3 border-t border-line pt-3">
                   {matches.length === 0 ? (
@@ -60,8 +61,9 @@ export default async function PlacePage({ searchParams }: { searchParams: Promis
                           <Link href={`/cases/${m.caseId}?focus=${p.id}`} className="flex items-center gap-2.5 rounded-xl border border-line bg-raised p-2.5 transition hover:border-ink">
                             <Ring value={m.breakdown.total} size={36} />
                             <span className="min-w-0 leading-tight">
-                              <span className="num block truncate text-[0.83rem] font-medium text-ink">{m.code}</span>
-                              <span className="block truncate text-[0.7rem] text-ink-3">{m.breakdown.driveMinutes} min · {m.breakdown.overlapSlots.length}/{m.breakdown.caseSlotCount} hrs{m.status === "RESTAFFING" ? " · restaff" : ""}</span>
+                              <span className="block truncate text-[0.8rem] font-semibold text-ink">{matchLabel(m.breakdown.total)}</span>
+                              <span className="num block truncate text-[0.72rem] text-ink-2">{m.code}</span>
+                              <span className="block truncate text-[0.7rem] text-ink-3">{m.breakdown.driveMinutes} min away{m.status === "RESTAFFING" ? " · restaffing" : ""}</span>
                             </span>
                           </Link>
                         </li>

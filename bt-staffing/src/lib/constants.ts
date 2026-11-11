@@ -34,6 +34,18 @@ export const STAGE_LABELS: Record<StageKey, string> = {
   PLACED: "Placed",
 };
 
+/** What each stage means in plain words, and what happens next. */
+export const STAGE_HELP: Record<StageKey, string> = {
+  APPLIED: "Applied, but has not filled in our form yet.",
+  FORM_COMPLETED: "Filled in our form. Next: a phone screen.",
+  SCREENED: "Phone screen done. Next: send the application.",
+  APPLICATION_SENT: "We sent the application. Next: send the in-service trainings.",
+  IN_SERVICES_SENT: "We sent the in-service trainings. Next: collect the paperwork.",
+  PAPERWORK_COMPLETE: "All paperwork is in. Waiting for the hire to show in Workday.",
+  READY_TO_PLACE: "Nothing missing. Can be placed on a case.",
+  PLACED: "Working a case.",
+};
+
 /**
  * Paperwork checklist. Every item must be ticked before a person reaches
  * "Paperwork complete". Edit this list to match United Care's real packet.

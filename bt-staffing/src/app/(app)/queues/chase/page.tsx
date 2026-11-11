@@ -7,7 +7,7 @@ import { formatMobile } from "@/lib/normalize";
 import { chaseQueue } from "@/lib/services/queues";
 import { NextStepButton } from "@/components/NextStepButton";
 import { QueueTabs } from "@/components/QueueTabs";
-import { Avatar, CaseLink, daysSince, EmptyState, FilterTabs, MissingList, PageHeader, PersonLink, Ring, StageBadge } from "@/components/ui";
+import { Avatar, CaseLink, daysSince, EmptyState, FilterTabs, fmtMiles, MissingList, PageHeader, PersonLink, StageBadge, StepsProgress } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Chase queue" };
 
@@ -24,7 +24,7 @@ export default async function ChasePage({ searchParams }: { searchParams: Promis
   const count = (s: string) => all.filter((r) => r.person.state === s).length;
   return (
     <>
-      <PageHeader title="Chase" subtitle="People who are not ready yet. Each row shows what is missing and the one thing to do next." />
+      <PageHeader title="Chase" subtitle="People who cannot work a case yet. Each row shows how many steps are left, what is missing, and a button for the one thing to do next." />
       <QueueTabs active="chase" />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterTabs base="/queues/chase" param="state" value={state} extra={{ sort }} options={[
@@ -46,7 +46,7 @@ export default async function ChasePage({ searchParams }: { searchParams: Promis
             const name = `${p.firstName} ${p.lastName}`;
             const done = Math.max(0, TOTAL_STEPS - missing.length);
             return (
-              <li key={p.id} data-row className="grid items-center gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-card transition hover:border-line-strong md:grid-cols-[minmax(0,15rem)_9.5rem_minmax(0,1fr)_auto]">
+              <li key={p.id} data-row className="grid items-center gap-x-4 gap-y-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-card transition hover:border-line-strong md:grid-cols-[minmax(0,14rem)_11.5rem_8.5rem_minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar name={name} tone="notready" />
                   <div className="min-w-0">
@@ -59,19 +59,17 @@ export default async function ChasePage({ searchParams }: { searchParams: Promis
                 <div className="text-sm">
                   {nearest ? (
                     <>
-                      <div className="flex items-center gap-1 font-medium text-ink"><MapPin size={13} className="text-ink-3" /><span className="num">{nearest.miles.toFixed(1)} mi</span></div>
-                      <div className="text-xs text-ink-3">to <CaseLink id={nearest.id} code={nearest.code} /></div>
+                      <div className="flex items-center gap-1 font-medium text-ink"><MapPin size={13} className="text-ink-3" /><span className="num">{fmtMiles(nearest.miles)}</span></div>
+                      <div className="text-xs text-ink-3">from waiting case <CaseLink id={nearest.id} code={nearest.code} /></div>
                     </>
                   ) : (
                     <div className="text-xs text-ink-3">No address yet,<br />distance unknown</div>
                   )}
                 </div>
-                <div className="flex min-w-0 items-center gap-3">
-                  <Ring value={done} max={TOTAL_STEPS} size={38} tone="notready" label={<span title={`${done} of ${TOTAL_STEPS} steps done`}>{missing.length}</span>} />
-                  <div className="min-w-0">
-                    <div className="mb-1"><StageBadge stage={p.stage} /></div>
-                    <MissingList missing={missing} max={3} />
-                  </div>
+                <StepsProgress done={done} total={TOTAL_STEPS} />
+                <div className="min-w-0">
+                  <div className="mb-1 flex items-center gap-1.5 text-xs text-ink-3">Stage: <StageBadge stage={p.stage} /></div>
+                  <MissingList missing={missing} max={3} />
                 </div>
                 <div className="flex justify-start md:justify-end">
                   <NextStepButton personId={p.id} step={step} canEdit={canEdit} primary={step.oneClick} />

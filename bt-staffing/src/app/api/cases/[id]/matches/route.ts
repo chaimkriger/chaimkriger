@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { fitSummary, matchLabel, matchSentence } from "@/lib/matching";
 import { loadCandidates, rankForCase } from "@/lib/services/matchingService";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       lat: m.candidate.lat,
       lng: m.candidate.lng,
       total: m.breakdown.total,
+      label: matchLabel(m.breakdown.total),
+      sentence: matchSentence(m.breakdown),
+      fit: fitSummary(m.breakdown.requirements).text,
       driveMinutes: m.breakdown.driveMinutes,
       overlap: m.breakdown.overlapSlots.length,
       caseSlots: m.breakdown.caseSlotCount,

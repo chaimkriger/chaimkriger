@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { config } from "@/lib/config";
-import { STAGES, STAGE_LABELS } from "@/lib/constants";
+import { STAGE_HELP, STAGES, STAGE_LABELS } from "@/lib/constants";
 import { nextStep } from "@/lib/nextStep";
 import { readinessOf } from "@/lib/services/people";
 import { formatMobile } from "@/lib/normalize";
@@ -39,7 +39,7 @@ export default async function ApplicantsPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title="Pipeline" subtitle="Every applicant, by stage. A card's button is the next step for that person. Placed people move to Staff.">
+      <PageHeader title="Pipeline" subtitle="Every applicant, grouped by how far along they are. The button on each card is the next thing to do for that person. Once someone is placed they move to Staff.">
         <div className="inline-flex gap-0.5 rounded-xl bg-sunken p-1">
           <Link href={qs({})} aria-current={!isList ? "true" : undefined} className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[0.82rem] font-medium", !isList ? "bg-surface text-ink shadow-sm" : "text-ink-2")}><Kanban size={14} /> Board</Link>
           <Link href={qs({ view: "list" })} aria-current={isList ? "true" : undefined} className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[0.82rem] font-medium", isList ? "bg-surface text-ink shadow-sm" : "text-ink-2")}><List size={14} /> List</Link>
@@ -68,9 +68,12 @@ export default async function ApplicantsPage({ searchParams }: { searchParams: P
               const col = filtered.filter((p) => p.stage === s);
               return (
                 <section key={s} data-column={s} className="flex w-[16.5rem] shrink-0 flex-col rounded-2xl bg-sunken/70 p-2">
-                  <header className="flex items-center justify-between px-2 pb-2 pt-1.5">
-                    <h2 className="text-[0.8rem] font-semibold text-ink">{label(s)}</h2>
-                    <span className="num rounded-full bg-surface px-2 text-xs font-medium leading-5 text-ink-2">{col.length}</span>
+                  <header className="px-2 pb-2 pt-1.5">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-[0.8rem] font-semibold text-ink">{label(s)}</h2>
+                      <span data-count className="num rounded-full bg-surface px-2 text-xs font-medium leading-5 text-ink-2">{col.length}</span>
+                    </div>
+                    <p className="mt-0.5 min-h-8 text-[0.7rem] leading-snug text-ink-3">{STAGE_HELP[s]}</p>
                   </header>
                   <ul className="space-y-2">
                     {col.slice(0, COLUMN_LIMIT).map((p) => {

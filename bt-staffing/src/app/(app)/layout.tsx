@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { ROLE_LABELS } from "@/lib/constants";
 import { can } from "@/lib/permissions";
 import { CommandPalette } from "@/components/CommandPalette";
+import { HelpGuide } from "@/components/HelpGuide";
 import { MobileNav, type NavItem, SideNav } from "@/components/Nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar } from "@/components/ui";
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <CommandPalette pages={items.map((i) => ({ href: i.href, label: i.label }))} />
           </div>
           <div className="flex items-center gap-1">
+            <HelpGuide />
             <ThemeToggle />
             <form action={logoutAction} className="md:hidden">
               <button aria-label="Sign out" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 hover:bg-sunken"><LogOut size={16} /></button>

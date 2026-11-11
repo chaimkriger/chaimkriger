@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  type MatchCandidate, type MatchCase, compareMatches, rankCandidates, scoreCandidate,
+  type MatchCandidate, type MatchCase, compareMatches, fitSummary, matchLabel, matchSentence, rankCandidates, scoreCandidate,
 } from "@/lib/matching";
 import { openSlots } from "@/lib/availability";
 import { straightLineMinutes } from "@/lib/geo/drivetime";
@@ -156,5 +156,30 @@ describe("open availability and distance helpers", () => {
     expect(car).toBeGreaterThanOrEqual(3);
     expect(car).toBeLessThanOrEqual(5);
     expect(noCar).toBeGreaterThan(car);
+  });
+});
+
+describe("plain-language summaries", () => {
+  it("names the score in words", () => {
+    expect([100, 80, 79, 60, 59, 40, 39, 0].map(matchLabel)).toEqual([
+      "Great match", "Great match", "Good match", "Good match", "Fair match", "Fair match", "Weak match", "Weak match",
+    ]);
+  });
+
+  it("says what is missing or needs checking, in words", () => {
+    const strict: MatchCase = { ...theCase, languageRequired: "Spanish", rbtRequired: true, ageGroup: "TEEN" };
+    const req = (c: MatchCandidate, k: MatchCase) => scoreCandidate(c, k, 5).result!.breakdown.requirements;
+    expect(fitSummary(req(cand(), theCase))).toEqual({ text: "No special requirements", ok: true });
+    expect(fitSummary(req(cand({ languages: ["Spanish"], certification: "CERTIFIED", ageGroups: ["TEEN"] }), strict))).toEqual({
+      text: "Meets every requirement", ok: true,
+    });
+    expect(fitSummary(req(cand(), strict))).toEqual({
+      text: "Missing: RBT certification, Spanish. To check: experience with this age group", ok: false,
+    });
+  });
+
+  it("puts drive and hours in one sentence", () => {
+    expect(matchSentence({ driveMinutes: 12, overlapSlots: ["MON_PM", "TUE_PM"], caseSlotCount: 4 })).toBe("12 min away · can cover 2 of 4 time slots");
+    expect(matchSentence({ driveMinutes: 3, overlapSlots: ["MON_PM"], caseSlotCount: 1 })).toBe("3 min away · can cover all 1 time slot");
   });
 });

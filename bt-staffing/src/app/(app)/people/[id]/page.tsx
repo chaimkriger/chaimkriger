@@ -16,7 +16,8 @@ import { topCasesForPerson } from "@/lib/services/queues";
 import { setMilestoneAction, simulateWorkdayHireAction } from "@/app/actions";
 import { ActionButton } from "@/components/ActionButton";
 import { NextStepButton } from "@/components/NextStepButton";
-import { Avatar, Badge, Card, CaseGlyph, CaseLink, CertBadge, cx, fmtDate, fmtShort, KindBadge, PageHeader, personTone, ReadyBadge, Ring, ScoreBar, SlotGrid, StageBadge } from "@/components/ui";
+import { fitSummary, matchSentence } from "@/lib/matching";
+import { Avatar, Badge, Card, CaseGlyph, CaseLink, CertBadge, cx, fmtDate, fmtShort, KindBadge, MatchWord, PageHeader, personTone, ReadyBadge, Ring, ScoreBar, SlotGrid, StageBadge, StepsProgress } from "@/components/ui";
 import { AgeGroupEditor, ChecklistToggle, NoteForm } from "./PersonControls";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -111,7 +112,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
       {/* Status banner: what is going on with this person and the one thing to do */}
       <div className={cx("mb-5 flex flex-wrap items-center gap-4 rounded-2xl border p-4", isReady ? "border-ready/30 bg-ready-soft" : p.kind === "STAFF" ? "border-line bg-surface" : "border-notready/25 bg-notready-soft")} data-banner>
-        {isApplicant && <Ring value={doneSteps} max={totalSteps} size={56} stroke={5} tone={isReady ? "ready" : "notready"} label={<span className="text-[0.8rem]">{doneSteps}/{totalSteps}</span>} />}
+        {isApplicant && <div className="w-36"><StepsProgress done={doneSteps} total={totalSteps} tone={isReady ? "ready" : "notready"} /></div>}
         <div className="min-w-0 flex-1">
           <div className="text-[0.95rem] font-semibold text-ink">
             {p.kind === "STAFF"
@@ -207,12 +208,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                     <Link href={`/cases/${m.caseId}?focus=${p.id}`} className="flex items-center gap-3 rounded-xl border border-line p-3 transition hover:border-ink">
                       <Ring value={m.breakdown.total} size={42} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2">
-                          <span className="num text-sm font-medium text-ink">{m.code}</span>
+                        <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                          <MatchWord total={m.breakdown.total} />
+                          <span className="num font-medium text-ink">{m.code}</span>
                           <span className="text-xs text-ink-3">{m.city}, {m.state}{m.status === "RESTAFFING" ? " · restaffing" : ""}</span>
                         </div>
                         <div className="mt-1.5"><ScoreBar drive={m.breakdown.driveScore} availability={m.breakdown.availabilityScore} requirements={m.breakdown.requirementsScore} /></div>
-                        <div className="mt-1 text-[0.72rem] text-ink-2">{m.breakdown.driveMinutes} min · covers {m.breakdown.overlapSlots.length}/{m.breakdown.caseSlotCount} hours · requirements {m.breakdown.requirementsScore}/20</div>
+                        <div className="mt-1 text-[0.72rem] text-ink-2">{matchSentence(m.breakdown)} · {fitSummary(m.breakdown.requirements).text}</div>
                       </div>
                     </Link>
                   </li>
