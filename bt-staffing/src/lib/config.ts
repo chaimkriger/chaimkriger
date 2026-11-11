@@ -8,7 +8,8 @@ function mode(name: string): Mode {
 
 export const config = {
   get appUrl() {
-    return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+    // RENDER_EXTERNAL_URL is set automatically on Render.
+    return (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000").replace(/\/$/, "");
   },
   get hubspotMode() {
     return mode("HUBSPOT_MODE");

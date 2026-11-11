@@ -1,0 +1,43 @@
+# Render blueprint for a TEST deployment of bt-staffing (free tier, fake demo data).
+# In Render: New > Blueprint > pick this repository and branch > Apply.
+# Not for real applicant data: see bt-staffing/DEPLOY.md for the Azure path.
+databases:
+  - name: bt-staffing-db
+    plan: free
+    databaseName: bt_staffing
+
+services:
+  - type: web
+    name: bt-staffing
+    runtime: docker
+    plan: free
+    rootDir: bt-staffing
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bt-staffing-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: WORKDAY_WEBHOOK_SECRET
+        generateValue: true
+      - key: SALESMSG_WEBHOOK_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: PORT
+        value: "3000"
+      # Loads the fake demo data the first time it starts.
+      - key: SEED_ON_START
+        value: "true"
+      - key: SHOW_DEMO_LOGINS
+        value: "true"
+      - key: HUBSPOT_MODE
+        value: mock
+      - key: APPLOI_MODE
+        value: mock
+      - key: SALESMSG_MODE
+        value: mock
+      - key: WORKDAY_MODE
+        value: mock

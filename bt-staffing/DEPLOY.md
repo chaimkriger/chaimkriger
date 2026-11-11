@@ -1,3 +1,17 @@
+# Quick test deployment (Render, free tier)
+
+For trying the app with the fake demo data, not for real applicant data.
+
+1. Sign in at render.com with GitHub.
+2. New > Blueprint > choose this repository and the branch you want to test.
+3. Apply. Render reads `render.yaml`, creates a free Postgres database and the
+   web service, builds the Docker image, applies migrations and loads the demo data.
+4. Open the service URL and use the demo sign-in buttons.
+
+Free tier limits: the app sleeps when idle (the first visit takes about a minute)
+and the free database is deleted after about 30 days.
+The blueprint has not been run yet; if Render rejects a field, the error names it.
+
 # Deploying to Azure
 
 Target: **App Service (Linux container)** + **Azure Container Registry** +
