@@ -1,0 +1,284 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  RECRUITER
+  OFFSHORE_RECRUITER
+  ADMIN
+}
+
+enum PersonKind {
+  APPLICANT
+  STAFF
+}
+
+enum Certification {
+  CERTIFIED
+  IN_PROGRESS
+  NOT_CERTIFIED
+}
+
+enum Stage {
+  APPLIED
+  FORM_COMPLETED
+  SCREENED
+  APPLICATION_SENT
+  IN_SERVICES_SENT
+  PAPERWORK_COMPLETE
+  READY_TO_PLACE
+  PLACED
+}
+
+enum CaseStatus {
+  NEEDS_STAFFING
+  STAFFED
+  RESTAFFING
+  DISCHARGED
+}
+
+enum AssignmentRole {
+  PRIMARY
+  BACKUP
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
+}
+
+enum RecipientStatus {
+  SENT
+  YES
+  NO
+  OTHER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  assignments Assignment[]
+  campaigns   OutreachCampaign[]
+  people      Person[]           @relation("PersonRecruiter")
+  notes       Note[]
+}
+
+/// Applicants and staff share one table. An applicant becomes STAFF when a
+/// recruiter places them as primary on a case.
+model Person {
+  id        String     @id @default(cuid())
+  kind      PersonKind @default(APPLICANT)
+  firstName String
+  lastName  String
+  /// Normalised to E.164 (+1XXXXXXXXXX). Match key #1.
+  mobile    String?    @unique
+  /// Lower-cased. Match key #2.
+  email     String?    @unique
+
+  address String?
+  city    String?
+  state   String?
+  zip     String?
+  lat     Float?
+  lng     Float?
+
+  certification    Certification @default(NOT_CERTIFIED)
+  /// Slot keys such as MON_AM, MON_PM, MON_EVE (see src/lib/constants.ts)
+  availability     String[]      @default([])
+  maxTravelMinutes Int           @default(30)
+  hasCar           Boolean       @default(false)
+  languages        String[]      @default([])
+  /// Age groups the person has experience with (set by recruiter at screening)
+  ageGroups        String[]      @default([])
+  earliestStart    DateTime?
+
+  /// Denormalised from the milestone fields below by src/lib/readiness.ts
+  stage Stage   @default(APPLIED)
+  /// Denormalised readiness flag (same source)
+  ready Boolean @default(false)
+
+  appliedAt         DateTime  @default(now())
+  formCompletedAt   DateTime?
+  screenedAt        DateTime?
+  applicationSentAt DateTime?
+  inServicesSentAt  DateTime?
+  hiredAt           DateTime?
+  placedAt          DateTime?
+  /// Checklist: { [itemKey]: true } — item keys in src/lib/constants.ts
+  checklist         Json      @default("{}")
+
+  source            String  @default("apploi-hubspot")
+  hubspotContactId  String? @unique
+  apploiId          String?
+  workdayEmployeeId String?
+
+  recruiterId String?
+  recruiter   User?   @relation("PersonRecruiter", fields: [recruiterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments Assignment[]
+  recipients  OutreachRecipient[]
+  messages    Message[]
+  notes       Note[]
+
+  @@index([kind, stage])
+  @@index([state])
+}
+
+model Case {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  /// Non-identifying label only (e.g. "Client 1042"). No PHI is stored here.
+  clientLabel String
+
+  address String?
+  city    String?
+  state   String?
+  zip     String?
+  lat     Float?
+  lng     Float?
+
+  /// Hours needed, as slot keys (same grid as Person.availability)
+  slots            String[] @default([])
+  hoursPerWeek     Int      @default(10)
+  languageRequired String?
+  ageGroup         String?
+  rbtRequired      Boolean  @default(false)
+  notes            String?
+
+  status                CaseStatus @default(NEEDS_STAFFING)
+  /// When the initial assessment finished; the "days waiting" clock starts here.
+  assessmentCompletedAt DateTime   @default(now())
+  /// When the case last entered NEEDS_STAFFING or RESTAFFING.
+  waitingSince          DateTime   @default(now())
+  staffedAt             DateTime?
+  dischargedAt          DateTime?
+
+  hubspotId         String?   @unique
+  hubspotSyncStatus String?
+  hubspotSyncedAt   DateTime?
+  hubspotSyncError  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments Assignment[]
+  campaigns   OutreachCampaign[]
+
+  @@index([status])
+}
+
+model Assignment {
+  id          String           @id @default(cuid())
+  caseId      String
+  case        Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  personId    String
+  person      Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role        AssignmentRole
+  status      AssignmentStatus @default(ACTIVE)
+  /// Backups only: 30 days after they were attached.
+  expiresAt   DateTime?
+  endedAt     DateTime?
+  endReason   String?
+  /// The recruiter who made the placement by hand.
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id])
+  via         String           @default("manual")
+  createdAt   DateTime         @default(now())
+
+  @@index([caseId, status])
+  @@index([personId, status])
+}
+
+model OutreachCampaign {
+  id          String   @id @default(cuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  body        String
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  recipients OutreachRecipient[]
+}
+
+model OutreachRecipient {
+  id         String           @id @default(cuid())
+  campaignId String
+  campaign   OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  personId   String
+  person     Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  status     RecipientStatus  @default(SENT)
+  /// Set from the order of YES replies: first yes = PRIMARY, later = BACKUP.
+  proposedRole AssignmentRole?
+  /// Set once a recruiter confirms the proposed role.
+  confirmedAt  DateTime?
+  sentAt     DateTime         @default(now())
+  repliedAt  DateTime?
+  replyText  String?
+
+  @@unique([campaignId, personId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  personId   String?
+  person     Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  direction  String
+  phone      String
+  body       String
+  kind       String   @default("general")
+  campaignId String?
+  externalId String?
+  createdAt  DateTime @default(now())
+
+  @@index([personId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model IntegrationLog {
+  id        String   @id @default(cuid())
+  system    String
+  direction String
+  action    String
+  status    String
+  summary   String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Backing store for the MOCK HubSpot adapter, so write-backs are visible in
+/// the Integrations screen. Unused when HUBSPOT_MODE=live.
+model MockHubspotObject {
+  id         String   @id
+  objectType String
+  properties Json
+  updatedAt  DateTime @updatedAt
+
+  @@index([objectType])
+}
