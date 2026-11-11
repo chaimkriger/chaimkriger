@@ -70,7 +70,7 @@ export function CandidateTable({
             {candidates.map((c, i) => {
               const b = c.breakdown;
               return (
-                <tr key={c.id} className={c.attachedAs ? "bg-violet-50/50" : undefined}>
+                <tr key={c.id} data-candidate={c.id} className={c.attachedAs ? "bg-violet-50/50" : undefined}>
                   {canOutreach && (
                     <td className="px-2 py-2 align-top">
                       <input type="checkbox" aria-label={`Select ${c.name} for outreach`} checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="h-4 w-4" />

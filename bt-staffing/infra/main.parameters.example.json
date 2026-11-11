@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": { "value": "ucbt" },
+    "postgresAdminPassword": { "value": "REPLACE-letters-and-digits-only" },
+    "authSecret": { "value": "REPLACE-with-openssl-rand-base64-48" },
+    "workdayWebhookSecret": { "value": "REPLACE" },
+    "salesmsgWebhookSecret": { "value": "REPLACE" },
+    "cronSecret": { "value": "REPLACE" },
+    "hubspotMode": { "value": "mock" },
+    "hubspotPrivateAppToken": { "value": "" },
+    "hubspotCaseObject": { "value": "deals" }
+  }
+}

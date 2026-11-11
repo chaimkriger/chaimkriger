@@ -140,6 +140,10 @@ function partialChecklist(): Record<string, boolean> {
 }
 
 async function main() {
+  if (process.env.SEED_ONLY_IF_EMPTY === "true" && (await prisma.user.count()) > 0) {
+    console.log("Database already has users: seed skipped.");
+    return;
+  }
   console.log("Clearing tables...");
   await prisma.message.deleteMany();
   await prisma.note.deleteMany();

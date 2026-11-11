@@ -41,10 +41,10 @@ async function run(fn: () => Promise<string | void>): Promise<ActionResult> {
 
 // --- auth ---------------------------------------------------------------------
 
-export async function loginAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "");
+export async function loginAction(input: { email: string; password: string; next: string }): Promise<ActionResult> {
+  const email = String(input?.email ?? "").trim().toLowerCase();
+  const password = String(input?.password ?? "");
+  const next = String(input?.next ?? "");
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   const valid = user ? await bcrypt.compare(password, user.passwordHash) : false;
   if (!user || !valid) return { ok: false, error: "Wrong email or password." };

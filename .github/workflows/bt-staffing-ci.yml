@@ -1,0 +1,41 @@
+name: BT Staffing CI
+
+on:
+  push:
+    paths: ["bt-staffing/**", ".github/workflows/bt-staffing-ci.yml"]
+  pull_request:
+    paths: ["bt-staffing/**", ".github/workflows/bt-staffing-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bt-staffing
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bt_staffing_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bt_staffing_test?schema=public
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/bt_staffing_test?schema=public
+      AUTH_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: bt-staffing/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

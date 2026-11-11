@@ -1,0 +1,44 @@
+# Local development stack:  docker compose up --build
+# App: http://localhost:3000   Postgres: localhost:5432 (postgres / postgres)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bt_staffing
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bt_staffing"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bt_staffing?schema=public
+      AUTH_SECRET: local-dev-secret-change-me-local-dev-secret
+      APP_URL: http://localhost:3000
+      # Plain http on localhost: do not mark the session cookie Secure.
+      INSECURE_COOKIES: "true"
+      # Loads the fake demo data the first time the stack starts.
+      SEED_ON_START: "true"
+      HUBSPOT_MODE: mock
+      APPLOI_MODE: mock
+      SALESMSG_MODE: mock
+      WORKDAY_MODE: mock
+      WORKDAY_WEBHOOK_SECRET: dev-workday-secret
+      SALESMSG_WEBHOOK_SECRET: dev-salesmsg-secret
+      CRON_SECRET: dev-cron-secret
+
+volumes:
+  pgdata:

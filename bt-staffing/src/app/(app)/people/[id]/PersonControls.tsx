@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addNoteAction, setAgeGroupsAction, setChecklistAction } from "@/app/actions";
 
@@ -8,24 +8,31 @@ export function ChecklistToggle({ personId, itemKey, label, group, done, disable
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Tick immediately, then confirm with the server.
+  const [checked, setChecked] = useState(done);
+  useEffect(() => setChecked(done), [done]);
   return (
     <label className={`flex items-center gap-2 text-sm ${disabled ? "" : "cursor-pointer"}`}>
       <input
         type="checkbox"
         className="h-4 w-4"
-        checked={done}
+        checked={checked}
         disabled={disabled || pending}
         onChange={(e) => {
           const next = e.target.checked;
           setError(null);
+          setChecked(next);
           start(async () => {
             const r = await setChecklistAction(personId, itemKey, next);
-            if (!r.ok) setError(r.error ?? "Could not save");
+            if (!r.ok) {
+              setError(r.error ?? "Could not save");
+              setChecked(!next);
+            }
             router.refresh();
           });
         }}
       />
-      <span className={done ? "text-slate-500 line-through" : "text-slate-900"}>{label}</span>
+      <span className={checked ? "text-slate-500 line-through" : "text-slate-900"}>{label}</span>
       <span className="text-xs text-slate-400">{group}</span>
       {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
     </label>

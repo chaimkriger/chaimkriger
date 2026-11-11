@@ -1,0 +1,17 @@
+name: BT Staffing Hourly Sync
+
+# Calls the app's sync endpoint (HubSpot applicants + cases, backup expiry).
+# Does nothing until the repository variable BT_STAFFING_URL is set.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    if: ${{ vars.BT_STAFFING_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -fsS -X POST "${{ vars.BT_STAFFING_URL }}/api/cron/sync" \
+            -H "Authorization: Bearer ${{ secrets.BT_STAFFING_CRON_SECRET }}"
